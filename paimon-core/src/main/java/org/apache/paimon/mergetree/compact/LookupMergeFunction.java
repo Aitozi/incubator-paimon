@@ -57,6 +57,9 @@ public class LookupMergeFunction implements MergeFunction<KeyValue> {
     @Override
     public KeyValue getResult() {
         // 1. Find the latest high level record
+        // QUE: candidates descending Iterator 意味着什么呢?
+        // 为啥第一个有不同level的keyvalue就是high level
+        // 这个降序和level有关系吗
         Iterator<KeyValue> descending = candidates.descendingIterator();
         while (descending.hasNext()) {
             KeyValue kv = descending.next();

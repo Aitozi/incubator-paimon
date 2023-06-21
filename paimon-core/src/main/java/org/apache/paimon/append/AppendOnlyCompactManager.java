@@ -71,8 +71,10 @@ public class AppendOnlyCompactManager extends CompactFutureManager {
     @Override
     public void triggerCompaction(boolean fullCompaction) {
         if (fullCompaction) {
+            // 挑选全部文件进行合并(跳过前面的大文件)
             triggerFullCompaction();
         } else {
+            // 挑选一部分文件进行合并
             triggerCompactionWithBestEffort();
         }
     }
@@ -82,6 +84,7 @@ public class AppendOnlyCompactManager extends CompactFutureManager {
                 taskFuture == null,
                 "A compaction task is still running while the user "
                         + "forces a new compaction. This is unexpected.");
+        // 至少有3个文件才触发Full Compaction
         if (toCompact.size() < FULL_COMPACT_MIN_FILE) {
             return;
         }
@@ -189,7 +192,7 @@ public class AppendOnlyCompactManager extends CompactFutureManager {
 
         public FullCompactTask(
                 Collection<DataFileMeta> inputs, long targetFileSize, CompactRewriter rewriter) {
-            this.inputs = new LinkedList<>(inputs);
+            this.inputs = new LinkedList<>(inputs); // 按照文件的 min sequence number来排序的
             this.targetFileSize = targetFileSize;
             this.rewriter = rewriter;
         }
@@ -197,13 +200,19 @@ public class AppendOnlyCompactManager extends CompactFutureManager {
         @Override
         protected CompactResult doCompact() throws Exception {
             // remove large files
+            // Append only table 的compact流程主要是为了压缩小文件,
+            // 所以这里如果文件已经满足target大小了则不进行compact
             while (!inputs.isEmpty()) {
                 DataFileMeta file = inputs.peekFirst();
                 if (file.fileSize() >= targetFileSize) {
                     inputs.poll();
                     continue;
                 }
-                break;
+                break; // QUE: 这里不理解, 为什么遇到第一个size < targetFileSize 就break了呢?
+                // 为了保障数据的有序性, 不能跳过, 所以只能把头几个大文件
+                // https://paimon.apache.org/docs/master/concepts/append-only-table/#streaming-read-order
+                // 应该是为了保障 For any two records from the same partition and the same bucket, the
+                // first written record will be produced first.
             }
 
             // compute small files
@@ -222,6 +231,7 @@ public class AppendOnlyCompactManager extends CompactFutureManager {
             List<DataFileMeta> compactAfter = new ArrayList<>();
             if (small > big && inputs.size() >= FULL_COMPACT_MIN_FILE) {
                 compactBefore = new ArrayList<>(inputs);
+                // IMP: 重写文件后的sequence number会变化, 但是实际上这里面的部分大文件是可以不用重写的
                 compactAfter = rewriter.rewrite(inputs);
             }
             return result(new ArrayList<>(compactBefore), compactAfter);

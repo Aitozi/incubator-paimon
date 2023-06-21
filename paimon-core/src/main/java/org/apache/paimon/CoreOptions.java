@@ -1051,6 +1051,10 @@ public class CoreOptions implements Serializable {
 
         FULL_COMPACTION("full-compaction", "Generate changelog files with each full compaction."),
 
+        // 针对lookup的changelog producer 需要
+        // 1. 使用LookupCompaction CompactionStrategy
+        // 2. 使用LookupMergeTreeCompactRewriter
+        // 3. 使用LookupMergeFunction
         LOOKUP(
                 "lookup",
                 "Generate changelog files through 'lookup' before committing the data writing.");

@@ -477,6 +477,7 @@ public class FileStoreCommitImpl implements FileStoreCommit {
                                 .withPartitionFilter(partitionFilter)
                                 .plan()
                                 .files();
+                // 将要过期的partitionFilter过滤出的文件都标记为DELETE
                 for (ManifestEntry entry : currentEntries) {
                     changesWithOverwrite.add(
                             new ManifestEntry(
@@ -487,6 +488,7 @@ public class FileStoreCommitImpl implements FileStoreCommit {
                                     entry.file()));
                 }
             }
+            // 同批commit可能还有其他的变更
             changesWithOverwrite.addAll(changes);
 
             if (tryCommitOnce(

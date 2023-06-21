@@ -105,6 +105,7 @@ public class InnerStreamTableScanImpl extends AbstractInnerTableScan
                             && boundedChecker.shouldEndInput(
                                     snapshotManager.snapshot(nextSnapshotId - 1));
         }
+        // 流读可能是空的
         return DataFilePlan.fromResult(result);
     }
 
@@ -128,6 +129,12 @@ public class InnerStreamTableScanImpl extends AbstractInnerTableScan
             }
 
             // first check changes of overwrite
+            // 如果开启了 stream read overwrite
+            // 首先会尝试读取OVERWRITE的变化数据
+            // 如何开启? 首先表类型要支持, 因为会对被过期掉的分区产生DELETE消息, 这一般认为是changelog table
+            // 才有的语义, 所以只在changelog table上开放了, 并且要开启 streaming-read-overwrite
+            // 最终使用 ReverseReader 来读取
+            // 这其实也意味着被标记为DELETE的文件并不是真正的删除,
             if (snapshot.commitKind() == Snapshot.CommitKind.OVERWRITE
                     && supportStreamingReadOverwrite) {
                 LOG.debug("Find overwrite snapshot id {}.", nextSnapshotId);
@@ -163,6 +170,7 @@ public class InnerStreamTableScanImpl extends AbstractInnerTableScan
                 break;
             case FULL_COMPACTION:
                 // this change in data split reader will affect both starting scanner and follow-up
+                // 只读取highest level的changelog文件
                 snapshotSplitReader.withLevelFilter(level -> level == options.numLevels() - 1);
                 followUpScanner = new CompactionChangelogFollowUpScanner();
                 break;

@@ -81,6 +81,8 @@ public class HashLookupStoreReader
             // Time
             createdAt = dataInputStream.readLong();
 
+            // QUE: 这个是写在文件前面的metadata ? 不同的格式写出的文件都一样?
+            // 这个读取的是 HashLookupStoreWriter重写出的数据
             // Metadata counters
             keyCount = dataInputStream.readInt();
             // Number of different key length

@@ -243,6 +243,7 @@ public class BinaryInMemorySortBuffer extends BinaryIndexedSortable implements S
 
     @Override
     public final MutableObjectIterator<BinaryRow> sortedIterator() {
+        // 写入的时候没有排序, 读取的时候会返回一个sorted iterator
         new QuickSort().sort(this);
         return iterator();
     }

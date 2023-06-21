@@ -146,11 +146,13 @@ public class RowDataStoreWriteOperator extends PrepareCommitOperator<RowData> {
 
         SinkRecord record;
         try {
+            // GlobalFullCompactionSinkWrite
+            // StoreSinkWriteImpl
             record = write.write(new FlinkRowWrapper(element.getValue()));
         } catch (Exception e) {
             throw new IOException(e);
         }
-
+        // 同步写到logSystem中. SinkRecord 中包含了partition，bucket，primary key信息
         if (logSinkFunction != null) {
             // write to log store, need to preserve original pk (which includes partition fields)
             SinkRecord logRecord = write.toLogRecord(record);

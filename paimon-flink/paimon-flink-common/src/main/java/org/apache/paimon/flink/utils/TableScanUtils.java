@@ -37,6 +37,9 @@ public class TableScanUtils {
                         put(CoreOptions.MergeEngine.AGGREGATE, "Pre-aggregate");
                     }
                 };
+        // pk表 并且merge engine是aggregate和partial_update, 那么要求changelog producer需要设置为
+        // lookup或者full-compaction.
+        // 这是因为对于这两种merge engine来说, 这张表的变更流没法直接从输入得到
         if (table.primaryKeys().size() > 0 && mergeEngineDesc.containsKey(mergeEngine)) {
             switch (options.changelogProducer()) {
                 case NONE:

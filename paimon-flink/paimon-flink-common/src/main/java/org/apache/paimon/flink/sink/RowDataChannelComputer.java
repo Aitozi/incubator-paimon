@@ -18,11 +18,11 @@
 
 package org.apache.paimon.flink.sink;
 
+import org.apache.flink.table.data.RowData;
+
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.table.sink.KeyAndBucketExtractor;
-
-import org.apache.flink.table.data.RowData;
 
 /** {@link ChannelComputer} for {@link RowData}. */
 public class RowDataChannelComputer implements ChannelComputer<RowData> {
@@ -49,12 +49,14 @@ public class RowDataChannelComputer implements ChannelComputer<RowData> {
     @Override
     public int channel(RowData record) {
         extractor.setRecord(record);
+        // NOTE: 分区和bucket确定要发送的channel
         return channel(extractor.partition(), extractor.bucket());
     }
 
     public int channel(BinaryRow partition, int bucket) {
         // log sinks like Kafka only consider bucket and don't care about partition
         // so same bucket, even from different partition, must go to the same channel
+        // kafka 同一个bucket的数据要路由到同一个channel
         return hasLogSink
                 ? ChannelComputer.select(bucket, numChannels)
                 : ChannelComputer.select(partition, bucket, numChannels);

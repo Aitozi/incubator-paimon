@@ -56,6 +56,8 @@ public class LookupMergeTreeCompactRewriter extends ChangelogMergeTreeRewriter {
             return false;
         }
 
+        // 有出现level 0的sorted run, 就要进行change log的处理
+        // 我理解有level 0
         for (List<SortedRun> runs : sections) {
             for (SortedRun run : runs) {
                 for (DataFileMeta file : run.files()) {

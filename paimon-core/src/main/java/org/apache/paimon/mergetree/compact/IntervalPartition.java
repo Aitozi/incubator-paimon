@@ -37,6 +37,7 @@ public class IntervalPartition {
 
     public IntervalPartition(List<DataFileMeta> inputFiles, Comparator<InternalRow> keyComparator) {
         this.files = new ArrayList<>(inputFiles);
+        // 按照文件最小和最大的key排序
         this.files.sort(
                 (o1, o2) -> {
                     int leftResult = keyComparator.compare(o1.minKey(), o2.minKey());
@@ -69,9 +70,12 @@ public class IntervalPartition {
         List<DataFileMeta> section = new ArrayList<>();
         BinaryRow bound = null;
 
+        // 每个section的key不重叠, 不重叠的key是不是可以并行compact?
         for (DataFileMeta meta : files) {
             if (!section.isEmpty() && keyComparator.compare(meta.minKey(), bound) > 0) {
                 // larger than current right bound, conclude current section and create a new one
+                // 如果minKey > 右边界,那么新建一个Section, 此section还要经过一个partition函数,
+                // 这个partition函数会创建出多个SortedRun, 每个SortedRun包含多个DataFileMeta
                 result.add(partition(section));
                 section.clear();
                 bound = null;
@@ -108,6 +112,7 @@ public class IntervalPartition {
             // any file list whose max key < meta.minKey() is sufficient,
             // for convenience we pick the smallest
             List<DataFileMeta> top = queue.poll();
+            // QUE: 这段逻辑不太理解
             if (keyComparator.compare(meta.minKey(), top.get(top.size() - 1).maxKey()) > 0) {
                 // append current file to an existing partition
                 top.add(meta);

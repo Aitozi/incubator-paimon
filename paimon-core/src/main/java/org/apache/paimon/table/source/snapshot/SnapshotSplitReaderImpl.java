@@ -181,9 +181,10 @@ public class SnapshotSplitReaderImpl implements SnapshotSplitReader {
                 generateSplits(
                         snapshotId,
                         true,
-                        true,
+                        true, // reverseRowKind 表示会将delete文件中的RowKind翻转过来
                         splitGenerator,
-                        FileStoreScan.Plan.groupByPartFiles(plan.files(FileKind.DELETE))));
+                        FileStoreScan.Plan.groupByPartFiles(
+                                plan.files(FileKind.DELETE)))); // 对此次snapshot中的DELETE文件翻转RowKind
 
         splits.addAll(
                 generateSplits(
@@ -221,6 +222,7 @@ public class SnapshotSplitReaderImpl implements SnapshotSplitReader {
                 int bucket = bucketEntry.getKey();
                 if (isIncremental) {
                     // Don't split when incremental
+                    // 增量读取的时候每个bucket就是一个split
                     splits.add(
                             new DataSplit(
                                     snapshotId,
@@ -230,6 +232,7 @@ public class SnapshotSplitReaderImpl implements SnapshotSplitReader {
                                     true,
                                     reverseRowKind));
                 } else {
+                    // 一个bucket下的多个文件可以切分成多个spits
                     splitGenerator.split(bucketEntry.getValue()).stream()
                             .map(
                                     files ->

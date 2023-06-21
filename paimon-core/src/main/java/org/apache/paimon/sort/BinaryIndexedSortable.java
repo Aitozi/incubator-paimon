@@ -133,9 +133,12 @@ public abstract class BinaryIndexedSortable implements IndexedSortable {
     /** Write of index and normalizedKey. */
     protected void writeIndexAndNormalizedKey(InternalRow record, long currOffset) {
         // add the pointer and the normalized key
+        // 记录相应的key和这个key所对应的data buffer的offset, 这样在排序的时候只需要对key进行操作
         this.currentSortIndexSegment.putLong(this.currentSortIndexOffset, currOffset);
 
         if (this.numKeyBytes != 0) {
+            // NOTE: org.apache.paimon.codegen.SortCodeGenerator.generatePutNormalizedKeys
+            // QUE: 这里好像是单独记录了一下key的信息
             normalizedKeyComputer.putKey(
                     record, this.currentSortIndexSegment, this.currentSortIndexOffset + OFFSET_LEN);
         }

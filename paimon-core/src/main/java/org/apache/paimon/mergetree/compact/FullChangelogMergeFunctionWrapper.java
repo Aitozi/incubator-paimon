@@ -94,6 +94,7 @@ public class FullChangelogMergeFunctionWrapper implements MergeFunctionWrapper<C
         reusedResult.reset();
         if (isInitialized) {
             KeyValue merged = mergeFunction.getResult();
+            // 最高层的kv record
             if (topLevelKv == null) {
                 if (merged != null && isAdd(merged)) {
                     reusedResult.addChangelog(replace(reusedAfter, RowKind.INSERT, merged));
@@ -104,11 +105,13 @@ public class FullChangelogMergeFunctionWrapper implements MergeFunctionWrapper<C
                             .addChangelog(replace(reusedBefore, RowKind.UPDATE_BEFORE, topLevelKv))
                             .addChangelog(replace(reusedAfter, RowKind.UPDATE_AFTER, merged));
                 } else {
+                    // QUE: full compaction 不是不会产生delete吗?
                     reusedResult.addChangelog(replace(reusedBefore, RowKind.DELETE, topLevelKv));
                 }
             }
             return reusedResult.setResultIfNotRetract(merged);
         } else {
+            // 没有执行过merge, topLevelKv为null
             if (topLevelKv == null && isAdd(initialKv)) {
                 reusedResult.addChangelog(replace(reusedAfter, RowKind.INSERT, initialKv));
             }

@@ -68,6 +68,7 @@ public class MergeTreeCompactTask extends CompactTask {
         // Checking the order and compacting adjacent and contiguous files
         // Note: can't skip an intermediate file to compact, this will destroy the overall
         // orderliness
+        // 不会跳过中间的文件不做compaction, 避免破坏顺序性
         for (List<SortedRun> section : partitioned) {
             if (section.size() > 1) {
                 candidate.add(section);
@@ -83,6 +84,12 @@ public class MergeTreeCompactTask extends CompactTask {
                         candidate.add(singletonList(SortedRun.fromSingle(file)));
                     } else {
                         // Large file appear, rewrite previous and upgrade it
+                        // 当遇到一个大文件, 因为不能破坏顺序, 所以就要将之前的candidates进行rewrite
+                        // 并且把当前这个大文件升级到target level 这样这个大文件就跳过Compact的流程了
+                        // QUE: 这里会导致某个文件的key range没有被合并吗?
+                        // 理论上不会, 上面的partition的过程就是为了让不同的Section之间的key的范围没有
+                        // overlap 所以可以跳过
+                        // QUE: 是每一个Section内的多个run key没有交集还是多个section之间key没有交集?
                         rewrite(candidate, result);
                         upgrade(file, result);
                     }

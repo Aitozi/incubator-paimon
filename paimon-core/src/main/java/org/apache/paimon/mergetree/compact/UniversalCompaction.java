@@ -47,9 +47,12 @@ public class UniversalCompaction implements CompactStrategy {
 
     public UniversalCompaction(
             int maxSizeAmp, int sizeRatio, int numRunCompactionTrigger, int maxSortedRunNum) {
+        // compaction.max-size-amplification-percent 最大空间放大比例
         this.maxSizeAmp = maxSizeAmp;
         this.sizeRatio = sizeRatio;
+        // num-sorted-run.compaction-trigger 触发compaction的最小的sorted run
         this.numRunCompactionTrigger = numRunCompactionTrigger;
+        // compaction.max-sorted-run-num 最大sorted run 的个数
         this.maxSortedRunNum = maxSortedRunNum;
     }
 
@@ -58,6 +61,7 @@ public class UniversalCompaction implements CompactStrategy {
         int maxLevel = numLevels - 1;
 
         // 1 checking for reducing size amplification
+        // 1. 空间放大条件触发的compaction
         CompactUnit unit = pickForSizeAmp(maxLevel, runs);
         if (unit != null) {
             if (LOG.isDebugEnabled()) {
@@ -67,6 +71,7 @@ public class UniversalCompaction implements CompactStrategy {
         }
 
         // 2 checking for size ratio
+        // 由Individual Size Ratio触发的合并
         unit = pickForSizeRatio(maxLevel, runs);
         if (unit != null) {
             if (LOG.isDebugEnabled()) {
@@ -94,6 +99,7 @@ public class UniversalCompaction implements CompactStrategy {
             return null;
         }
 
+        // 不包含最后一个
         long candidateSize =
                 runs.subList(0, runs.size() - 1).stream()
                         .map(LevelSortedRun::run)
@@ -103,6 +109,7 @@ public class UniversalCompaction implements CompactStrategy {
         long earliestRunSize = runs.get(runs.size() - 1).run().totalSize();
 
         // size amplification = percentage of additional size
+        // 总大小已经超过了最早的sorted run两倍, 触发全部文件的compact
         if (candidateSize * 100 > maxSizeAmp * earliestRunSize) {
             return CompactUnit.fromLevelRuns(maxLevel, runs);
         }
@@ -129,6 +136,9 @@ public class UniversalCompaction implements CompactStrategy {
         long candidateSize = candidateSize(runs, candidateCount);
         for (int i = candidateCount; i < runs.size(); i++) {
             LevelSortedRun next = runs.get(i);
+            // 如果有任意一个level出现 从 0-此level的文件大小 / 下一层的文件大小 小于sizeRatio
+            // 那么就将这层文件及之前的合并到下一层文件
+            // https://blog.csdn.net/qq_40586164/article/details/117914647
             if (candidateSize * (100.0 + sizeRatio) / 100.0 < next.run().totalSize()) {
                 break;
             }
@@ -165,6 +175,7 @@ public class UniversalCompaction implements CompactStrategy {
             // level of next run - 1
             outputLevel = Math.max(0, runs.get(runCount).level() - 1);
         }
+        // runCount 表示候选的compact的第几个
 
         if (outputLevel == 0) {
             // do not output level 0

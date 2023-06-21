@@ -89,6 +89,7 @@ public class RocksDBSetState extends RocksDBState<List<byte[]>> {
     public void add(InternalRow key, InternalRow value) throws IOException {
         try {
             byte[] bytes = invalidKeyAndGetKVBytes(key, value);
+            // 将key和value一起作为key存储, value为一个空byte
             db.put(columnFamily, writeOptions, bytes, EMPTY);
         } catch (RocksDBException e) {
             throw new IOException(e);

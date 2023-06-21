@@ -45,6 +45,7 @@ public interface CompactStrategy {
             // only 1 sorted run on the max level, nothing to compact
             return Optional.empty();
         } else {
+            // full compaction 之后数据都是写到了最大的一层
             return Optional.of(CompactUnit.fromLevelRuns(maxLevel, runs));
         }
     }

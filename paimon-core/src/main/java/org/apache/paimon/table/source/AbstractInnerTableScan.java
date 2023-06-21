@@ -81,11 +81,12 @@ public abstract class AbstractInnerTableScan implements InnerTableScan {
 
         CoreOptions.StartupMode startupMode = options.startupMode();
         switch (startupMode) {
+                // QUE: 为什么LATEST_FULL 不需要区分流读还是批读呢?
             case LATEST_FULL:
                 return new FullStartingScanner();
             case LATEST:
                 return isStreaming
-                        ? new ContinuousLatestStartingScanner()
+                        ? new ContinuousLatestStartingScanner() // 不读取Snapshot
                         : new FullStartingScanner();
             case COMPACTED_FULL:
                 if (options.changelogProducer() == ChangelogProducer.FULL_COMPACTION
@@ -107,6 +108,7 @@ public abstract class AbstractInnerTableScan implements InnerTableScan {
                                 CoreOptions.SCAN_TIMESTAMP_MILLIS.key(),
                                 CoreOptions.StartupMode.FROM_TIMESTAMP,
                                 CoreOptions.SCAN_MODE.key()));
+                // 流模式返回的都是NextSnapshot
                 return isStreaming
                         ? new ContinuousFromTimestampStartingScanner(startupMillis)
                         : new StaticFromTimestampStartingScanner(startupMillis);
@@ -121,8 +123,9 @@ public abstract class AbstractInnerTableScan implements InnerTableScan {
                                 startupMode,
                                 CoreOptions.SCAN_MODE.key()));
                 return isStreaming && startupMode == CoreOptions.StartupMode.FROM_SNAPSHOT
-                        ? new ContinuousFromSnapshotStartingScanner(snapshotId)
-                        : new StaticFromSnapshotStartingScanner(snapshotId);
+                        ? new ContinuousFromSnapshotStartingScanner(snapshotId) //
+                        : new StaticFromSnapshotStartingScanner(
+                                snapshotId); // FROM_SNAPSHOT_FULL 会读取历史文件
             default:
                 throw new UnsupportedOperationException(
                         "Unknown startup mode " + startupMode.name());

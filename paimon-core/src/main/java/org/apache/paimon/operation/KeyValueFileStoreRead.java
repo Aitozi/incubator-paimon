@@ -183,6 +183,7 @@ public class KeyValueFileStoreRead implements FileStoreRead<KeyValue> {
                             false,
                             filtersForNonOverlappedSection);
 
+            // Merge On Read 实现
             List<ConcatRecordReader.ReaderSupplier<KeyValue>> sectionReaders = new ArrayList<>();
             MergeFunctionWrapper<KeyValue> mergeFuncWrapper =
                     new ReducerMergeFunctionWrapper(mfFactory.create(valueProjection));

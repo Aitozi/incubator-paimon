@@ -74,6 +74,7 @@ public class ChangelogValueCountFileStoreTable extends AbstractFileStoreTable {
     @Override
     public KeyValueFileStore store() {
         if (lazyStore == null) {
+            // 将全列作为主键
             KeyValueFieldsExtractor extractor = ValueCountTableKeyValueFieldsExtractor.EXTRACTOR;
             RowType countType = new RowType(extractor.valueFields(tableSchema));
             lazyStore =

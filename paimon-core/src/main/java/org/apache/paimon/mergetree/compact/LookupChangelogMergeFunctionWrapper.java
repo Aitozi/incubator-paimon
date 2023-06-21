@@ -59,6 +59,7 @@ public class LookupChangelogMergeFunctionWrapper implements MergeFunctionWrapper
                 mergeFunction instanceof LookupMergeFunction,
                 "Merge function should be a LookupMergeFunction, but is %s, there is a bug.",
                 mergeFunction.getClass().getName());
+        // 外层的lookup merge function
         this.mergeFunction = (LookupMergeFunction) mergeFunction;
         this.mergeFunction2 = mergeFunctionFactory.create();
         this.lookup = lookup;
@@ -84,17 +85,22 @@ public class LookupChangelogMergeFunctionWrapper implements MergeFunctionWrapper
         boolean containLevel0 = mergeFunction.containLevel0;
 
         // 1. No level 0, just return
+        // 没有level 0的数据, 意味着没有新数据产生
+        // 那么没有changelog文件产生, 只是高层文件的合并
         if (!containLevel0) {
             return reusedResult.setResult(result);
         }
 
         // 2. With level 0, with the latest high level, return changelog
+        // 先前的value也在此次的Compaction列表里面,直接就可以得出change log了
         if (highLevel != null) {
             setChangelog(highLevel, result);
             return reusedResult.setResult(result);
         }
 
         // 3. Lookup to find the latest high level record
+        // 向更高level中查找这个key先前的数据, 为了产生变更流代价还是挺高的
+        // org.apache.paimon.mergetree.LookupLevels#lookup
         highLevel = lookup.apply(result.key());
         if (highLevel != null) {
             mergeFunction2.reset();
@@ -110,6 +116,7 @@ public class LookupChangelogMergeFunctionWrapper implements MergeFunctionWrapper
 
     private void setChangelog(KeyValue before, KeyValue after) {
         if (before == null || !isAdd(before)) {
+            // 前值为空或者前值不是INSERT/UPDATE_AFTER 后值为INSERT
             if (isAdd(after)) {
                 reusedResult.addChangelog(replaceAfter(RowKind.INSERT, after));
             }

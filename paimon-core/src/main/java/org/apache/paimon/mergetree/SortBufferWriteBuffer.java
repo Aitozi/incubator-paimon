@@ -211,6 +211,7 @@ public class SortBufferWriteBuffer implements WriteBuffer {
                 mergeFunctionWrapper.reset();
                 mergeFunctionWrapper.add(previous.getReusedKv());
 
+                // 将同一个key的数据都投喂到mergeFunction然后得到一个合并结果
                 while (readOnce()) {
                     if (keyComparator.compare(
                                     previous.getReusedKv().key(), current.getReusedKv().key())

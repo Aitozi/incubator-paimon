@@ -277,6 +277,7 @@ public abstract class AbstractFileStoreScan implements FileStoreScan {
             case ALL:
                 return snapshot.dataManifests(manifestList);
             case DELTA:
+                // 读取的是两次snapshot之间的delta部分
                 return snapshot.deltaManifests(manifestList);
             case CHANGELOG:
                 if (snapshot.version() > Snapshot.TABLE_STORE_02_VERSION) {

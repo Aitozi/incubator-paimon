@@ -98,6 +98,7 @@ public class KeyValueFileWriterFactory {
         }
     }
 
+    // changelog file 和上面的 MergeTreeFileWriter 看起来只是文件前缀不一样?
     public RollingFileWriter<KeyValue, DataFileMeta> createRollingChangelogFileWriter(int level) {
         return new RollingFileWriter<>(
                 () ->

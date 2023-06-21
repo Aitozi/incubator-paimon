@@ -191,10 +191,11 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
     }
 
     private LookupFile createLookupFile(DataFileMeta file) throws IOException {
-        File localFile = localFileFactory.get();
+        File localFile = localFileFactory.get(); // 创建一个本地文件
         if (!localFile.createNewFile()) {
             throw new IOException("Can not create new file: " + localFile);
         }
+        // 创建原始文件的reader, 读出重写成一个LookupFile
         try (LookupStoreWriter kvWriter = lookupStoreFactory.createWriter(localFile);
                 RecordReader<KeyValue> reader = fileReaderFactory.apply(file)) {
             DataOutputSerializer valueOut = new DataOutputSerializer(32);
@@ -208,6 +209,9 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
                     valueOut.writeLong(kv.sequenceNumber());
                     valueOut.writeByte(kv.valueKind().toByteValue());
                     byte[] valueBytes = valueOut.getCopyOfBuffer();
+                    // 在这个遍历的过程中已经可以进行key的比较了,但是如果有很多次查询的话,可以利用构建出的LookupFile来加速
+                    // 这里是否能直接重写一份HFile格式的文件呢?
+                    // 设置在compact的时候直接产生一份HFile的文件,不用再read一次?
                     kvWriter.put(keyBytes, valueBytes);
                 }
                 batch.releaseBatch();

@@ -36,6 +36,7 @@ public interface KeyAndBucketExtractor<T> {
 
     int bucket();
 
+    // QUE: trimmedPrimaryKey 和 logPrimaryKey 什么区别？
     BinaryRow trimmedPrimaryKey();
 
     BinaryRow logPrimaryKey();

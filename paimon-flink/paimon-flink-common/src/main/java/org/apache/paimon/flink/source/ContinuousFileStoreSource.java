@@ -67,6 +67,7 @@ public class ContinuousFileStoreSource extends FlinkSource {
             splits = checkpoint.splits();
         }
         CoreOptions coreOptions = CoreOptions.fromMap(options);
+        // 流式读取newStreamScan
         StreamTableScan scan = readBuilder.newStreamScan();
         scan.restore(nextSnapshotId);
         return new ContinuousFileSplitEnumerator(
@@ -83,6 +84,7 @@ public class ContinuousFileStoreSource extends FlinkSource {
     @Override
     public FileStoreSourceReader<?> createSourceReader(
             SourceReaderContext context, TableRead read, @Nullable Long limit) {
+        // 是否需要保障读取的原子性,避免将ub和ua分在两个checkpoint中
         return Options.fromMap(options).get(STREAMING_READ_ATOMIC)
                 ? new FileStoreSourceReader<>(RecordsFunction.forSingle(), context, read, limit)
                 : new FileStoreSourceReader<>(RecordsFunction.forIterate(), context, read, limit);

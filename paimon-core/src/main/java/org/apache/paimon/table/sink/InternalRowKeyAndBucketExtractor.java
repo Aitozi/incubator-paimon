@@ -54,6 +54,7 @@ public class InternalRowKeyAndBucketExtractor implements KeyAndBucketExtractor<I
         bucketKeyProjection =
                 CodeGenUtils.newProjection(
                         schema.logicalRowType(), schema.projection(schema.bucketKeys()));
+        // 排除掉partition的主键列
         trimmedPrimaryKeyProjection =
                 CodeGenUtils.newProjection(
                         schema.logicalRowType(), schema.projection(schema.trimmedPrimaryKeys()));
@@ -90,6 +91,7 @@ public class InternalRowKeyAndBucketExtractor implements KeyAndBucketExtractor<I
             }
         }
         if (bucket == null) {
+            // NOTE: 根据bucket key计算分桶
             bucket =
                     KeyAndBucketExtractor.bucket(
                             KeyAndBucketExtractor.bucketKeyHashCode(bucketKey), numBuckets);

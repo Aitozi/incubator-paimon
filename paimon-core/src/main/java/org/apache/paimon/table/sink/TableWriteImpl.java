@@ -100,7 +100,8 @@ public class TableWriteImpl<T>
         return new SinkRecord(
                 record.partition(),
                 record.bucket(),
-                keyAndBucketExtractor.logPrimaryKey(),
+                keyAndBucketExtractor
+                        .logPrimaryKey(), // logPrimaryKey和SinkRecord中的primary key有什么不一样吗？
                 record.row());
     }
 

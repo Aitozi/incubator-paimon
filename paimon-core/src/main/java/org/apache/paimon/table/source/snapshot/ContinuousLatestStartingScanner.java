@@ -40,6 +40,7 @@ public class ContinuousLatestStartingScanner implements StartingScanner {
             LOG.debug("There is currently no snapshot. Wait for the snapshot generation.");
             return new NoSnapshot();
         }
+        // 因为不读取Snapshot, 所以返回的NextSnapshot 并没有splits
         return new NextSnapshot(startingSnapshotId + 1);
     }
 }

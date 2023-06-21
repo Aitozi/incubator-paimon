@@ -103,6 +103,7 @@ public class AppendOnlyFileStoreWrite extends AbstractFileStoreWrite<InternalRow
         // and make restore files mutable to update
         long maxSequenceNumber = getMaxSequenceNumber(restoredFiles);
         DataFilePathFactory factory = pathFactory.createDataFilePathFactory(partition, bucket);
+        // QUE: 为什么Append only表也需要 compact呢? ~~key又没有重叠~~ 为了合并小文件
         CompactManager compactManager =
                 skipCompaction
                         ? new NoopCompactManager()

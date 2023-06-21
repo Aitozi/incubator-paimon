@@ -47,6 +47,7 @@ public abstract class FlinkSource
 
     @Override
     public SourceReader<RowData, FileStoreSourceSplit> createReader(SourceReaderContext context) {
+        // QUE: 这里竟然没有直接和splits交互
         return createSourceReader(context, readBuilder.newRead(), limit);
     }
 

@@ -31,7 +31,6 @@ import org.apache.paimon.utils.ExecutorThreadFactory;
 import org.apache.paimon.utils.RecordWriter;
 import org.apache.paimon.utils.Restorable;
 import org.apache.paimon.utils.SnapshotManager;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,6 +89,7 @@ public abstract class AbstractFileStoreWrite<T>
     @Override
     public void write(BinaryRow partition, int bucket, T data) throws Exception {
         RecordWriter<T> writer = getWriterWrapper(partition, bucket).writer;
+        // 写入 ， 更新stats
         writer.write(data);
     }
 

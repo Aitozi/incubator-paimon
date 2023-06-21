@@ -69,6 +69,7 @@ public class KeyValueSerializer extends ObjectSerializer<KeyValue> {
             InternalRow key, long sequenceNumber, RowKind valueKind, InternalRow value) {
         reusedMeta.setField(0, sequenceNumber);
         reusedMeta.setField(1, valueKind.toByteValue());
+        // 把key value 拼接成一个Row
         return reusedRow.replace(reusedKeyWithMeta.replace(key, reusedMeta), value);
     }
 

@@ -31,6 +31,7 @@ public interface CompactUnit {
 
     List<DataFileMeta> files();
 
+    // CompactUnit 的file顺序是从低层到高层
     static CompactUnit fromLevelRuns(int outputLevel, List<LevelSortedRun> runs) {
         List<DataFileMeta> files = new ArrayList<>();
         for (LevelSortedRun run : runs) {

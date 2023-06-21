@@ -132,6 +132,7 @@ public class Schema {
                 fieldNames,
                 primaryKeys);
         Set<String> pkSet = new HashSet<>(primaryKeys);
+        // QUE: 为什么主键约束需要包含所有的分区字段呢? 是因为写入的时候不会去跨分区更新吗？
         Preconditions.checkState(
                 pkSet.containsAll(partitionKeys),
                 "Primary key constraint %s should include all partition fields %s",

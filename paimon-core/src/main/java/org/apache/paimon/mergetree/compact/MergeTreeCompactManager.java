@@ -72,6 +72,10 @@ public class MergeTreeCompactManager extends CompactFutureManager {
 
     @Override
     public boolean shouldWaitCompaction() {
+        // level0 每个文件一个sorted run, 下面就是每一层一个 sorted run, sorted run 应该主要是指内存的BinarySort的过程
+        // 太多sorted run的话会影响查询性能, 因为sorted run之间是没有合并的, 查询时需要进行MergeOnRead
+        // 这里就是检查当大于 numSortedRunStopTrigger的时候就暂停写入
+        // https://paimon.apache.org/docs/master/maintenance/write-performance/#number-of-sorted-runs-to-trigger-compaction
         return levels.numberOfSortedRuns() > numSortedRunStopTrigger;
     }
 
@@ -99,6 +103,8 @@ public class MergeTreeCompactManager extends CompactFutureManager {
                         "Trigger forced full compaciton. Picking from the following runs\n{}",
                         runs);
             }
+            // 什么是FullCompaction? 涉及全文件的compaction
+            // compaction是为了避免太多的sorted run, 影响查询效率,所以要将多个sorted run合并,这个过程就是compaction
             optionalUnit = CompactStrategy.pickFullCompaction(levels.numberOfLevels(), runs);
         } else {
             if (taskFuture != null) {

@@ -397,6 +397,7 @@ public class Snapshot {
         COMPACT,
 
         /** Changes that clear up the whole partition and then add new records. */
+        // 分区过期的时候产生的一类commit类型
         OVERWRITE
     }
 }

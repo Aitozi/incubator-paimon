@@ -58,6 +58,7 @@ public class HashLookupStoreWriter implements LookupStoreWriter {
     private File[] indexFiles;
     private DataOutputStream[] indexStreams;
     // Data stream
+    // 每一个keyLength维护一个文件
     private File[] dataFiles;
     private DataOutputStream[] dataStreams;
     // Cache last value
@@ -105,6 +106,7 @@ public class HashLookupStoreWriter implements LookupStoreWriter {
         int keyLength = key.length;
 
         // Get the Output stream for that keyLength, each key length has its own file
+        // 按照key的长度来归类
         DataOutputStream indexStream = getIndexStream(keyLength);
 
         // Write key
@@ -199,6 +201,8 @@ public class HashLookupStoreWriter implements LookupStoreWriter {
 
             // Merge and write to output
             checkFreeDiskSpace(filesToMerge);
+            // 将多个key长度的临时数据和metadata文件,最终合并成单个文件
+            // metadata file , index file, data file
             mergeFiles(filesToMerge, outputStream);
         } finally {
             outputStream.close();

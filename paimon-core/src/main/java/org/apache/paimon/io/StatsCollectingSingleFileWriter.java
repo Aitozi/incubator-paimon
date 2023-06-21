@@ -64,6 +64,7 @@ public abstract class StatsCollectingSingleFileWriter<T, R> extends SingleFileWr
     public void write(T record) throws IOException {
         InternalRow rowData = writeImpl(record);
         if (fieldStatsCollector != null) {
+            // 提取每一行的min、max等信息，但是这个不是Parquet格式本身就有的能力吗？
             fieldStatsCollector.collect(rowData);
         }
     }

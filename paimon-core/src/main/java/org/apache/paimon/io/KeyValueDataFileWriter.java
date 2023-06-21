@@ -55,6 +55,7 @@ public class KeyValueDataFileWriter
     private final RowType keyType;
     private final RowType valueType;
     private final long schemaId;
+    // 看起来这个level并不影响写出的行为,只是会最终记录到Meta中
     private final int level;
 
     private final FieldStatsArraySerializer keyStatsConverter;

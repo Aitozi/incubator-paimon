@@ -127,6 +127,9 @@ public class FlinkSourceBuilder {
     }
 
     private ReadBuilder createReadBuilder() {
+        // table的创建还是归根于
+        // org.apache.paimon.flink.AbstractFlinkTableFactory.buildPaimonTable
+        // org.apache.paimon.table.FileStoreTableFactory.create
         return table.newReadBuilder().withProjection(projectedFields).withFilter(predicate);
     }
 
@@ -175,6 +178,7 @@ public class FlinkSourceBuilder {
             throw new IllegalArgumentException("StreamExecutionEnvironment should not be null.");
         }
 
+        // streaming 就是continuous的
         if (isContinuous) {
             TableScanUtils.streamingReadingValidate(table);
 
@@ -203,6 +207,7 @@ public class FlinkSourceBuilder {
                 }
             }
         } else {
+            // 批模式读取静态文件
             return buildStaticFileSource();
         }
     }

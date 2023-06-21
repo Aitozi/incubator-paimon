@@ -54,6 +54,8 @@ public class ReverseReader implements RecordReader<KeyValue> {
                 if (kv == null) {
                     return null;
                 }
+                // QUE: 为什么呢?
+                // 难道是因为drop的分区一定都已经固化完成, 都是INSERT消息吗?
                 if (kv.valueKind() == RowKind.UPDATE_BEFORE || kv.valueKind() == RowKind.DELETE) {
                     throw new IllegalStateException(
                             "In reverse reader, the value kind of records cannot be UPDATE_BEFORE or DELETE.");

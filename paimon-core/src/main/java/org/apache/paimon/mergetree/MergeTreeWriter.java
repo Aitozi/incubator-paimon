@@ -188,6 +188,7 @@ public class MergeTreeWriter implements RecordWriter<KeyValue>, MemoryOwner {
                 waitForLatestCompaction = true;
             }
 
+            // 如果配置了ChangelogProducer.INPUT 那么再刷写WriteBuffer的时候会同时将原始数据写入到changelog里面
             final RollingFileWriter<KeyValue, DataFileMeta> changelogWriter =
                     changelogProducer == ChangelogProducer.INPUT
                             ? writerFactory.createRollingChangelogFileWriter(0)
@@ -200,7 +201,7 @@ public class MergeTreeWriter implements RecordWriter<KeyValue>, MemoryOwner {
                         keyComparator,
                         mergeFunction,
                         changelogWriter == null ? null : changelogWriter::write,
-                        dataWriter::write);
+                        dataWriter::write); // 最终使用的Orc/Parquet Writer来将数据写出
             } finally {
                 if (changelogWriter != null) {
                     changelogWriter.close();

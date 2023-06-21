@@ -53,6 +53,7 @@ public class FileStoreTableFactory {
 
     public static FileStoreTable create(FileIO fileIO, Options options) {
         Path tablePath = CoreOptions.path(options);
+        // create 表的时候首先已经有schema文件写入相应的目录了
         TableSchema tableSchema =
                 new SchemaManager(fileIO, tablePath)
                         .latest()
@@ -85,6 +86,7 @@ public class FileStoreTableFactory {
             table = new AppendOnlyFileStoreTable(fileIO, tablePath, tableSchema);
         } else {
             if (tableSchema.primaryKeys().isEmpty()) {
+                // 没有PK但是设置了写入模式是Changelog类型, 会将全列作为主键, 并记录出现的次数来进行回撤
                 table = new ChangelogValueCountFileStoreTable(fileIO, tablePath, tableSchema);
             } else {
                 table = new ChangelogWithKeyFileStoreTable(fileIO, tablePath, tableSchema);
