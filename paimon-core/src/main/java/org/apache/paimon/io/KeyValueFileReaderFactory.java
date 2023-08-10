@@ -74,6 +74,12 @@ public class KeyValueFileReaderFactory {
 
     public RecordReader<KeyValue> createRecordReader(long schemaId, String fileName, int level)
             throws IOException {
+        return createRecordReader(schemaId, fileName, level, null);
+    }
+
+    public RecordReader<KeyValue> createRecordReader(
+            long schemaId, String fileName, int level, @Nullable Predicate predicate)
+            throws IOException {
         String formatIdentifier = DataFilePathFactory.formatIdentifier(fileName);
         BulkFormatMapping bulkFormatMapping =
                 bulkFormatMappings.computeIfAbsent(
@@ -81,8 +87,9 @@ public class KeyValueFileReaderFactory {
                         key -> {
                             TableSchema tableSchema = schemaManager.schema(this.schemaId);
                             TableSchema dataSchema = schemaManager.schema(key.schemaId);
+                            bulkFormatMappingBuilder.withFilter(predicate);
                             return bulkFormatMappingBuilder.build(
-                                    formatIdentifier, tableSchema, dataSchema);
+                                    formatIdentifier, tableSchema, dataSchema, predicate);
                         });
         return new KeyValueDataFileRecordReader(
                 fileIO,

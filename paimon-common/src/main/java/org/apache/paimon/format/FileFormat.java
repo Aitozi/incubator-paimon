@@ -19,12 +19,16 @@
 package org.apache.paimon.format;
 
 import org.apache.paimon.CoreOptions;
+import org.apache.paimon.annotation.Documentation;
 import org.apache.paimon.annotation.VisibleForTesting;
 import org.apache.paimon.format.FileFormatFactory.FormatContext;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.predicate.Predicate;
+import org.apache.paimon.predicate.PredicateBuilder;
 import org.apache.paimon.statistics.FieldStatsCollector;
 import org.apache.paimon.types.RowType;
+
+import org.apache.paimon.shade.guava30.com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nullable;
 
@@ -74,7 +78,8 @@ public abstract class FileFormat {
     }
 
     public FormatReaderFactory createReaderFactory(RowType rowType, int[][] projection) {
-        return createReaderFactory(rowType, projection, new ArrayList<>());
+        Predicate predicate = new PredicateBuilder(rowType).equal(1, 10);
+        return createReaderFactory(rowType, projection, ImmutableList.of(predicate));
     }
 
     public Optional<TableStatsExtractor> createStatsExtractor(

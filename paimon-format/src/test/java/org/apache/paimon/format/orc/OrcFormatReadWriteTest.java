@@ -32,6 +32,8 @@ public class OrcFormatReadWriteTest extends FormatReadWriteTest {
 
     @Override
     protected FileFormat fileFormat() {
-        return new OrcFileFormat(new FileFormatFactory.FormatContext(new Options(), 1024));
+        Options options = new Options();
+        options.set("bloom.filter.columns", "f1");
+        return new OrcFileFormat(new FileFormatFactory.FormatContext(options, 1024));
     }
 }

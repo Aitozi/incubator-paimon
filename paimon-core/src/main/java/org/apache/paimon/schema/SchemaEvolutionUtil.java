@@ -284,7 +284,7 @@ public class SchemaEvolutionUtil {
     @Nullable
     public static List<Predicate> createDataFilters(
             List<DataField> tableFields, List<DataField> dataFields, List<Predicate> filters) {
-        if (filters == null) {
+        if (filters == null || filters.isEmpty()) {
             return null;
         }
 

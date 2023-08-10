@@ -285,9 +285,9 @@ public class KeyValueFileStoreWrite extends MemoryFileStoreWrite<KeyValue> {
                 levels,
                 keyComparatorSupplier.get(),
                 keyType,
-                file ->
+                (file, predicate) ->
                         readerFactory.createRecordReader(
-                                file.schemaId(), file.fileName(), file.level()),
+                                file.schemaId(), file.fileName(), file.level(), predicate),
                 () -> ioManager.createChannel().getPathFile(),
                 new HashLookupStoreFactory(
                         cacheManager,

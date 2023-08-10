@@ -27,8 +27,11 @@ import org.apache.paimon.lookup.LookupStoreFactory;
 import org.apache.paimon.lookup.LookupStoreReader;
 import org.apache.paimon.lookup.LookupStoreWriter;
 import org.apache.paimon.options.MemorySize;
+import org.apache.paimon.predicate.Predicate;
+import org.apache.paimon.predicate.PredicateBuilder;
 import org.apache.paimon.reader.RecordReader;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.utils.BiFunctionWithIOE;
 import org.apache.paimon.utils.FileIOUtils;
 import org.apache.paimon.utils.IOFunction;
 
@@ -58,23 +61,27 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
     private final Levels levels;
     private final Comparator<InternalRow> keyComparator;
     private final RowCompactedSerializer keySerializer;
-    private final IOFunction<DataFileMeta, RecordReader<KeyValue>> fileReaderFactory;
+    private final BiFunctionWithIOE<DataFileMeta, Predicate, RecordReader<KeyValue>>
+            fileReaderFactory;
     private final Supplier<File> localFileFactory;
     private final LookupStoreFactory lookupStoreFactory;
 
     private final Cache<String, ContainsFile> containsFiles;
 
+    private final RowType keyType;
+
     public ContainsLevels(
             Levels levels,
             Comparator<InternalRow> keyComparator,
             RowType keyType,
-            IOFunction<DataFileMeta, RecordReader<KeyValue>> fileReaderFactory,
+            BiFunctionWithIOE<DataFileMeta, Predicate, RecordReader<KeyValue>> fileReaderFactory,
             Supplier<File> localFileFactory,
             LookupStoreFactory lookupStoreFactory,
             Duration fileRetention,
             MemorySize maxDiskSize) {
         this.levels = levels;
         this.keyComparator = keyComparator;
+        this.keyType = keyType;
         this.keySerializer = new RowCompactedSerializer(keyType);
         this.fileReaderFactory = fileReaderFactory;
         this.localFileFactory = localFileFactory;
@@ -114,7 +121,8 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
     private Boolean contains(InternalRow key, DataFileMeta file) throws IOException {
         ContainsFile containsFile = containsFiles.getIfPresent(file.fileName());
         while (containsFile == null || containsFile.isClosed) {
-            containsFile = createContainsFile(file);
+            Predicate predicate = new PredicateBuilder(keyType).equal(0, key);
+            containsFile = createContainsFile(file, predicate);
             containsFiles.put(file.fileName(), containsFile);
         }
         if (containsFile.get(keySerializer.serializeToBytes(key)) != null) {
@@ -137,13 +145,14 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
         }
     }
 
-    private ContainsFile createContainsFile(DataFileMeta file) throws IOException {
+    private ContainsFile createContainsFile(DataFileMeta file, Predicate predicate)
+            throws IOException {
         File localFile = localFileFactory.get();
         if (!localFile.createNewFile()) {
             throw new IOException("Can not create new file: " + localFile);
         }
         try (LookupStoreWriter kvWriter = lookupStoreFactory.createWriter(localFile);
-                RecordReader<KeyValue> reader = fileReaderFactory.apply(file)) {
+                RecordReader<KeyValue> reader = fileReaderFactory.apply(file, predicate)) {
             RecordReader.RecordIterator<KeyValue> batch;
             KeyValue kv;
             while ((batch = reader.readBatch()) != null) {
