@@ -22,6 +22,7 @@ import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.reader.RecordReader;
+import org.apache.paimon.types.RowType;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -31,5 +32,6 @@ public interface FormatReaderFactory extends Serializable {
 
     RecordReader<InternalRow> createReader(FileIO fileIO, Path file) throws IOException;
 
-    boolean keyExists(FileIO fileIO, Path file)
+    boolean keyMayExists(FileIO fileIO, Path file, InternalRow key, RowType keyType)
+            throws IOException;
 }

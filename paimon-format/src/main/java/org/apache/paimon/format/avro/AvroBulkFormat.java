@@ -55,6 +55,11 @@ public class AvroBulkFormat implements FormatReaderFactory {
         return new AvroReader(fileIO, file);
     }
 
+    @Override
+    public boolean keyMayExists(FileIO fileIO, Path file, InternalRow key, RowType keyType) {
+        return true;
+    }
+
     private class AvroReader implements RecordReader<InternalRow> {
 
         private final FileIO fileIO;

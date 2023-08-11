@@ -73,15 +73,8 @@ public class KeyValueFileReaderFactory {
         this.bulkFormatMappings = new HashMap<>();
     }
 
-    public RecordReader<KeyValue> createRecordReader(long schemaId, String fileName, int level)
-            throws IOException {
-        return createRecordReader(schemaId, fileName, level, null);
-    }
-
     public boolean keyExists(InternalRow testKey, DataFileMeta fileMeta) throws IOException {
         String fileName = fileMeta.fileName();
-        int level = fileMeta.level();
-        Predicate predicate = null;
         String formatIdentifier = DataFilePathFactory.formatIdentifier(fileName);
         BulkFormatMapping bulkFormatMapping =
                 bulkFormatMappings.computeIfAbsent(
@@ -89,26 +82,15 @@ public class KeyValueFileReaderFactory {
                         key -> {
                             TableSchema tableSchema = schemaManager.schema(this.schemaId);
                             TableSchema dataSchema = schemaManager.schema(key.schemaId);
-                            bulkFormatMappingBuilder.withFilter(predicate);
                             return bulkFormatMappingBuilder.build(
-                                    formatIdentifier, tableSchema, dataSchema, predicate);
+                                    formatIdentifier, tableSchema, dataSchema);
                         });
-        RecordReader.RecordIterator<KeyValue> value =
-                new KeyValueDataFileRecordReader(
-                                fileIO,
-                                bulkFormatMapping.getReaderFactory(),
-                                pathFactory.toPath(fileName),
-                                keyType,
-                                valueType,
-                                level,
-                                bulkFormatMapping.getIndexMapping(),
-                                bulkFormatMapping.getCastMapping())
-                        .readBatch();
-        return value.next() == null;
+        return bulkFormatMapping
+                .getReaderFactory()
+                .keyMayExists(fileIO, pathFactory.toPath(fileName), testKey, keyType);
     }
 
-    public RecordReader<KeyValue> createRecordReader(
-            long schemaId, String fileName, int level, @Nullable Predicate predicate)
+    public RecordReader<KeyValue> createRecordReader(long schemaId, String fileName, int level)
             throws IOException {
         String formatIdentifier = DataFilePathFactory.formatIdentifier(fileName);
         BulkFormatMapping bulkFormatMapping =
@@ -117,9 +99,8 @@ public class KeyValueFileReaderFactory {
                         key -> {
                             TableSchema tableSchema = schemaManager.schema(this.schemaId);
                             TableSchema dataSchema = schemaManager.schema(key.schemaId);
-                            bulkFormatMappingBuilder.withFilter(predicate);
                             return bulkFormatMappingBuilder.build(
-                                    formatIdentifier, tableSchema, dataSchema, predicate);
+                                    formatIdentifier, tableSchema, dataSchema);
                         });
         return new KeyValueDataFileRecordReader(
                 fileIO,

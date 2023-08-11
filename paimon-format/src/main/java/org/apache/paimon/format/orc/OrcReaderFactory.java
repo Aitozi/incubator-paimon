@@ -26,14 +26,19 @@ import org.apache.paimon.data.columnar.VectorizedColumnBatch;
 import org.apache.paimon.format.FormatReaderFactory;
 import org.apache.paimon.format.fs.HadoopReadOnlyFileSystem;
 import org.apache.paimon.format.orc.filter.OrcFilters;
+import org.apache.paimon.format.orc.filter.OrcPredicateFunctionVisitor;
 import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
+import org.apache.paimon.predicate.Predicate;
+import org.apache.paimon.predicate.PredicateBuilder;
 import org.apache.paimon.reader.RecordReader.RecordIterator;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.IOUtils;
 import org.apache.paimon.utils.Pair;
 import org.apache.paimon.utils.Pool;
+
+import org.apache.paimon.shade.guava30.com.google.common.collect.ImmutableList;
 
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
@@ -47,7 +52,9 @@ import org.apache.orc.TypeDescription;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.apache.paimon.format.orc.reader.AbstractOrcColumnVector.createPaimonVector;
 import static org.apache.paimon.format.orc.reader.OrcSplitReaderUtil.toOrcType;
@@ -105,9 +112,47 @@ public class OrcReaderFactory implements FormatReaderFactory {
                         file,
                         0,
                         fileIO.getFileSize(file));
-        //        System.out.println(orcReader.getRowNumber());
 
         return new OrcVectorizedReader(orcReader, poolOfBatches);
+    }
+
+    @Override
+    public boolean keyMayExists(FileIO fileIO, Path file, InternalRow key, RowType keyType)
+            throws IOException {
+        PredicateBuilder builder = new PredicateBuilder(tableType);
+        List<Predicate> predicates = new ArrayList<>();
+        for (String fieldName : keyType.getFieldNames()) {
+            int idx = tableType.getFieldNames().indexOf(fieldName);
+            if (idx < 0) {
+                throw new RuntimeException();
+            }
+            predicates.add(
+                    builder.equal(
+                            idx,
+                            InternalRow.createFieldGetter(tableType, idx).getFieldOrNull(key)));
+        }
+        List<OrcFilters.Predicate> orcPredicates = new ArrayList<>(conjunctPredicates);
+
+        for (Predicate pred : predicates) {
+            Optional<OrcFilters.Predicate> orcPred =
+                    pred.visit(OrcPredicateFunctionVisitor.VISITOR);
+            orcPred.ifPresent(orcPredicates::add);
+        }
+        Pool<OrcReaderBatch> poolOfBatches = createPoolOfBatches(1);
+        // close resource
+        RecordReader orcReader =
+                createRecordReader(
+                        hadoopConfigWrapper.getHadoopConfig(),
+                        schema,
+                        selectedFields,
+                        orcPredicates,
+                        fileIO,
+                        file,
+                        0,
+                        fileIO.getFileSize(file));
+
+        OrcVectorizedReader reader = new OrcVectorizedReader(orcReader, poolOfBatches);
+        return reader.readBatch() != null;
     }
 
     /**

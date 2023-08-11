@@ -95,19 +95,8 @@ public class BulkFormatMapping {
             this.filters = filters;
         }
 
-        public BulkFormatMappingBuilder withFilter(Predicate predicate) {
-            if (filters == null) {
-                filters = new ArrayList<>();
-            }
-            filters.add(predicate);
-            return this;
-        }
-
         public BulkFormatMapping build(
-                String formatIdentifier,
-                TableSchema tableSchema,
-                TableSchema dataSchema,
-                @Nullable Predicate predicate) {
+                String formatIdentifier, TableSchema tableSchema, TableSchema dataSchema) {
             List<DataField> tableKeyFields = extractor.keyFields(tableSchema);
             List<DataField> tableValueFields = extractor.valueFields(tableSchema);
             int[][] tableProjection =
@@ -159,17 +148,12 @@ public class BulkFormatMapping {
                             Projection.of(dataProjection).toTopLevelIndexes(),
                             dataKeyFields,
                             dataValueFields);
-            List<Predicate> baseFilters =
-                    this.filters == null ? new ArrayList<>() : new ArrayList<>(this.filters);
-            if (predicate != null) {
-                baseFilters.add(predicate);
-            }
 
             List<Predicate> dataFilters =
                     tableSchema.id() == dataSchema.id()
-                            ? baseFilters
+                            ? filters
                             : SchemaEvolutionUtil.createDataFilters(
-                                    tableSchema.fields(), dataSchema.fields(), baseFilters);
+                                    tableSchema.fields(), dataSchema.fields(), filters);
             return new BulkFormatMapping(
                     indexCastMapping.getIndexMapping(),
                     indexCastMapping.getCastMapping(),
