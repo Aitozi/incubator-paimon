@@ -30,4 +30,6 @@ import java.io.Serializable;
 public interface FormatReaderFactory extends Serializable {
 
     RecordReader<InternalRow> createReader(FileIO fileIO, Path file) throws IOException;
+
+    boolean keyExists(FileIO fileIO, Path file)
 }

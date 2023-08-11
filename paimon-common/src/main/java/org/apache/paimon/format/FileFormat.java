@@ -78,8 +78,9 @@ public abstract class FileFormat {
     }
 
     public FormatReaderFactory createReaderFactory(RowType rowType, int[][] projection) {
-        Predicate predicate = new PredicateBuilder(rowType).equal(1, 10);
-        return createReaderFactory(rowType, projection, ImmutableList.of(predicate));
+        //        Predicate predicate = new PredicateBuilder(rowType).equal(1, 10);
+        //        return createReaderFactory(rowType, projection, ImmutableList.of(predicate));
+        return createReaderFactory(rowType, projection, new ArrayList<>());
     }
 
     public Optional<TableStatsExtractor> createStatsExtractor(

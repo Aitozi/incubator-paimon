@@ -20,6 +20,7 @@ package org.apache.paimon.io;
 
 import org.apache.paimon.KeyValue;
 import org.apache.paimon.data.BinaryRow;
+import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.format.FileFormatDiscover;
 import org.apache.paimon.format.FormatKey;
 import org.apache.paimon.fs.FileIO;
@@ -75,6 +76,35 @@ public class KeyValueFileReaderFactory {
     public RecordReader<KeyValue> createRecordReader(long schemaId, String fileName, int level)
             throws IOException {
         return createRecordReader(schemaId, fileName, level, null);
+    }
+
+    public boolean keyExists(InternalRow testKey, DataFileMeta fileMeta) throws IOException {
+        String fileName = fileMeta.fileName();
+        int level = fileMeta.level();
+        Predicate predicate = null;
+        String formatIdentifier = DataFilePathFactory.formatIdentifier(fileName);
+        BulkFormatMapping bulkFormatMapping =
+                bulkFormatMappings.computeIfAbsent(
+                        new FormatKey(schemaId, formatIdentifier),
+                        key -> {
+                            TableSchema tableSchema = schemaManager.schema(this.schemaId);
+                            TableSchema dataSchema = schemaManager.schema(key.schemaId);
+                            bulkFormatMappingBuilder.withFilter(predicate);
+                            return bulkFormatMappingBuilder.build(
+                                    formatIdentifier, tableSchema, dataSchema, predicate);
+                        });
+        RecordReader.RecordIterator<KeyValue> value =
+                new KeyValueDataFileRecordReader(
+                                fileIO,
+                                bulkFormatMapping.getReaderFactory(),
+                                pathFactory.toPath(fileName),
+                                keyType,
+                                valueType,
+                                level,
+                                bulkFormatMapping.getIndexMapping(),
+                                bulkFormatMapping.getCastMapping())
+                        .readBatch();
+        return value.next() == null;
     }
 
     public RecordReader<KeyValue> createRecordReader(

@@ -105,6 +105,7 @@ public class OrcReaderFactory implements FormatReaderFactory {
                         file,
                         0,
                         fileIO.getFileSize(file));
+        //        System.out.println(orcReader.getRowNumber());
 
         return new OrcVectorizedReader(orcReader, poolOfBatches);
     }

@@ -180,9 +180,8 @@ public class ContainsLevelsTest {
                 levels,
                 comparator,
                 keyType,
-                (file, predicate) ->
-                        createReaderFactory()
-                                .createRecordReader(0, file.fileName(), file.level(), predicate),
+                file -> createReaderFactory().createRecordReader(0, file.fileName(), file.level()),
+                (file, key) -> true,
                 () -> new File(tempDir.toFile(), LOOKUP_FILE_PREFIX + UUID.randomUUID()),
                 new HashLookupStoreFactory(new CacheManager(2048, MemorySize.ofMebiBytes(1)), 0.75),
                 Duration.ofHours(1),
