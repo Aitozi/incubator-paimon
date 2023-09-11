@@ -181,7 +181,7 @@ public class ContainsLevelsTest {
                 comparator,
                 keyType,
                 file -> createReaderFactory().createRecordReader(0, file.fileName(), file.level()),
-                (file, key) -> true,
+                (file, key) -> createReaderFactory().keyExists(key, file),
                 () -> new File(tempDir.toFile(), LOOKUP_FILE_PREFIX + UUID.randomUUID()),
                 new HashLookupStoreFactory(new CacheManager(2048, MemorySize.ofMebiBytes(1)), 0.75),
                 Duration.ofHours(1),
@@ -205,7 +205,7 @@ public class ContainsLevelsTest {
 
     private KeyValueFileWriterFactory createWriterFactory() {
         Path path = new Path(tempDir.toUri().toString());
-        String identifier = "avro";
+        String identifier = "orc";
         Map<String, FileStorePathFactory> pathFactoryMap = new HashMap<>();
         pathFactoryMap.put(identifier, new FileStorePathFactory(path));
         return KeyValueFileWriterFactory.builder(
@@ -228,7 +228,7 @@ public class ContainsLevelsTest {
                         0,
                         keyType,
                         rowType,
-                        ignore -> new FlushingFileFormat("avro"),
+                        ignore -> new FlushingFileFormat("orc"),
                         new FileStorePathFactory(path),
                         new KeyValueFieldsExtractor() {
                             @Override

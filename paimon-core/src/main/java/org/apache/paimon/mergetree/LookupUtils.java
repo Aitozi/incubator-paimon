@@ -59,6 +59,16 @@ public class LookupUtils {
             SortedRun level,
             BiFunctionWithIOE<InternalRow, DataFileMeta, T> lookup)
             throws IOException {
+        return lookup(keyComparator, target, level, lookup, null);
+    }
+
+    public static <T> T lookup(
+            Comparator<InternalRow> keyComparator,
+            InternalRow target,
+            SortedRun level,
+            BiFunctionWithIOE<InternalRow, DataFileMeta, T> lookup,
+            BiFunctionWithIOE<DataFileMeta, InternalRow, Boolean> keyTester)
+            throws IOException {
         List<DataFileMeta> files = level.files();
         int left = 0;
         int right = files.size() - 1;
@@ -89,7 +99,9 @@ public class LookupUtils {
         }
 
         // if files does not have a next, it means the key does not exist in this level
-        return index < files.size() ? lookup.apply(target, files.get(index)) : null;
+        return index < files.size() && keyTester.apply(files.get(index), target)
+                ? lookup.apply(target, files.get(index))
+                : null;
     }
 
     public static int fileKibiBytes(File file) {

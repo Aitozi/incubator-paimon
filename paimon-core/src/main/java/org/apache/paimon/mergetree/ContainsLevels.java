@@ -67,7 +67,7 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
 
     private final Cache<String, ContainsFile> containsFiles;
 
-    private final RowType keyType;
+    private final BiFunctionWithIOE<DataFileMeta, InternalRow, Boolean> keyTester;
 
     public ContainsLevels(
             Levels levels,
@@ -81,7 +81,6 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
             MemorySize maxDiskSize) {
         this.levels = levels;
         this.keyComparator = keyComparator;
-        this.keyType = keyType;
         this.keySerializer = new RowCompactedSerializer(keyType);
         this.fileReaderFactory = fileReaderFactory;
         this.localFileFactory = localFileFactory;
@@ -95,6 +94,7 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
                         .executor(MoreExecutors.directExecutor())
                         .build();
         levels.addDropFileCallback(this);
+        this.keyTester = keyTester;
     }
 
     @VisibleForTesting
@@ -114,8 +114,7 @@ public class ContainsLevels implements Levels.DropFileCallback, Closeable {
 
     @Nullable
     private Boolean contains(InternalRow key, SortedRun level) throws IOException {
-        Predicate predicate = new PredicateBuilder(keyType).equal(0, key);
-        return LookupUtils.lookup(keyComparator, key, level, this::contains);
+        return LookupUtils.lookup(keyComparator, key, level, this::contains, keyTester);
     }
 
     @Nullable
