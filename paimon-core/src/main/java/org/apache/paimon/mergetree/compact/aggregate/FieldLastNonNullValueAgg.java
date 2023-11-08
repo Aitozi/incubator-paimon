@@ -24,13 +24,14 @@ import org.apache.paimon.types.DataType;
 public class FieldLastNonNullValueAgg extends FieldAggregator {
 
     public static final String NAME = "last_non_null_value";
+    private static final long serialVersionUID = 1L;
 
     public FieldLastNonNullValueAgg(DataType dataType) {
         super(dataType);
     }
 
     @Override
-    String name() {
+    public String name() {
         return NAME;
     }
 
@@ -43,4 +44,7 @@ public class FieldLastNonNullValueAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return accumulator;
     }
+
+    @Override
+    public void reset() {}
 }

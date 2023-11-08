@@ -26,13 +26,14 @@ import org.apache.paimon.utils.DecimalUtils;
 public class FieldSumAgg extends FieldAggregator {
 
     public static final String NAME = "sum";
+    private static final long serialVersionUID = 1L;
 
     public FieldSumAgg(DataType dataType) {
         super(dataType);
     }
 
     @Override
-    String name() {
+    public String name() {
         return NAME;
     }
 
@@ -161,4 +162,7 @@ public class FieldSumAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return agg(accumulator, inputField);
     }
+
+    @Override
+    public void reset() {}
 }

@@ -24,13 +24,14 @@ import org.apache.paimon.types.DataType;
 public class FieldPrimaryKeyAgg extends FieldAggregator {
 
     public static final String NAME = "primary-key";
+    private static final long serialVersionUID = 1L;
 
     public FieldPrimaryKeyAgg(DataType dataType) {
         super(dataType);
     }
 
     @Override
-    String name() {
+    public String name() {
         return NAME;
     }
 
@@ -48,4 +49,7 @@ public class FieldPrimaryKeyAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return agg(accumulator, inputField);
     }
+
+    @Override
+    public void reset() {}
 }

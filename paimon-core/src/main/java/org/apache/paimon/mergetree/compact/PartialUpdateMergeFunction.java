@@ -87,6 +87,7 @@ public class PartialUpdateMergeFunction implements MergeFunction<KeyValue> {
     public void reset() {
         this.currentKey = null;
         this.row = new GenericRow(getters.length);
+        fieldAggregators.values().forEach(FieldAggregator::reset);
         this.isEmpty = true;
     }
 

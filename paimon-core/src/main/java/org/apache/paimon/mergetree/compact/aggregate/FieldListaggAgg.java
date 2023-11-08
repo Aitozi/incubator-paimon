@@ -30,12 +30,14 @@ public class FieldListaggAgg extends FieldAggregator {
     // TODO: make it configurable by with clause
     public static final String DELIMITER = ",";
 
+    private static final long serialVersionUID = 1L;
+
     public FieldListaggAgg(DataType dataType) {
         super(dataType);
     }
 
     @Override
-    String name() {
+    public String name() {
         return NAME;
     }
 
@@ -67,4 +69,7 @@ public class FieldListaggAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return agg(accumulator, inputField);
     }
+
+    @Override
+    public void reset() {}
 }

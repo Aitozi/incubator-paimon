@@ -30,6 +30,7 @@ import org.apache.paimon.utils.Projection;
 
 import javax.annotation.Nullable;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.apache.paimon.CoreOptions.FIELDS_PREFIX;
@@ -65,6 +66,7 @@ public class AggregateMergeFunction implements MergeFunction<KeyValue> {
     public void reset() {
         this.latestKv = null;
         this.row = new GenericRow(getters.length);
+        Arrays.stream(aggregators).forEach(FieldAggregator::reset);
     }
 
     @Override

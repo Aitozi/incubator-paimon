@@ -64,6 +64,9 @@ public abstract class FieldAggregator implements Serializable {
                     case FieldLastValueAgg.NAME:
                         fieldAggregator = new FieldLastValueAgg(fieldType);
                         break;
+                    case FieldFirstValueAgg.NAME:
+                        fieldAggregator = new FieldFirstValueAgg(fieldType);
+                        break;
                     case FieldListaggAgg.NAME:
                         fieldAggregator = new FieldListaggAgg(fieldType);
                         break;
@@ -91,11 +94,17 @@ public abstract class FieldAggregator implements Serializable {
         return fieldAggregator;
     }
 
-    abstract String name();
+    /** return the name of the aggregator. */
+    public abstract String name();
 
+    /** Accumulate a new input field. */
     public abstract Object agg(Object accumulator, Object inputField);
 
+    /** Accumulate a new input field of an old sequence. */
     public abstract Object aggForOldSequence(Object accumulator, Object inputField);
+
+    /** reset the aggregator to a clean start state. */
+    public abstract void reset();
 
     public Object retract(Object accumulator, Object retractField) {
         throw new UnsupportedOperationException(

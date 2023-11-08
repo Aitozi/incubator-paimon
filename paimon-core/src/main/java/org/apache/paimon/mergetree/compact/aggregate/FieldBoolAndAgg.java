@@ -24,13 +24,14 @@ import org.apache.paimon.types.DataType;
 public class FieldBoolAndAgg extends FieldAggregator {
 
     public static final String NAME = "bool_and";
+    private static final long serialVersionUID = 1L;
 
     public FieldBoolAndAgg(DataType dataType) {
         super(dataType);
     }
 
     @Override
-    String name() {
+    public String name() {
         return NAME;
     }
 
@@ -56,4 +57,7 @@ public class FieldBoolAndAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return agg(accumulator, inputField);
     }
+
+    @Override
+    public void reset() {}
 }

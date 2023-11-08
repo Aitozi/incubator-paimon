@@ -21,6 +21,7 @@ package org.apache.paimon.mergetree.compact.aggregate;
 /** An aggregator which ignores retraction messages. */
 public class FieldIgnoreRetractAgg extends FieldAggregator {
 
+    private static final long serialVersionUID = 1L;
     private final FieldAggregator aggregator;
 
     public FieldIgnoreRetractAgg(FieldAggregator aggregator) {
@@ -29,7 +30,7 @@ public class FieldIgnoreRetractAgg extends FieldAggregator {
     }
 
     @Override
-    String name() {
+    public String name() {
         return aggregator.name();
     }
 
@@ -47,4 +48,7 @@ public class FieldIgnoreRetractAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return aggregator.aggForOldSequence(accumulator, inputField);
     }
+
+    @Override
+    public void reset() {}
 }

@@ -26,13 +26,14 @@ import org.apache.paimon.utils.InternalRowUtils;
 public class FieldMaxAgg extends FieldAggregator {
 
     public static final String NAME = "max";
+    private static final long serialVersionUID = 1L;
 
     public FieldMaxAgg(DataType dataType) {
         super(dataType);
     }
 
     @Override
-    String name() {
+    public String name() {
         return NAME;
     }
 
@@ -57,4 +58,7 @@ public class FieldMaxAgg extends FieldAggregator {
     public Object aggForOldSequence(Object accumulator, Object inputField) {
         return agg(accumulator, inputField);
     }
+
+    @Override
+    public void reset() {}
 }

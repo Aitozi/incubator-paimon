@@ -97,6 +97,21 @@ public class FieldAggregatorTest {
     }
 
     @Test
+    public void testFieldFirstValueAgg() {
+        FieldFirstValueAgg fieldFirstValueAgg = new FieldFirstValueAgg(new IntType());
+        assertThat(fieldFirstValueAgg.agg(null, 1)).isEqualTo(1);
+        assertThat(fieldFirstValueAgg.agg(1, 2)).isEqualTo(1);
+        assertThat(fieldFirstValueAgg.aggForOldSequence(2, 3)).isEqualTo(3);
+        assertThat(fieldFirstValueAgg.aggForOldSequence(3, 4)).isEqualTo(4);
+
+        fieldFirstValueAgg.reset();
+        assertThat(fieldFirstValueAgg.agg(null, null)).isNull();
+        assertThat(fieldFirstValueAgg.agg(null, 1)).isNull();
+        assertThat(fieldFirstValueAgg.aggForOldSequence(null, 1)).isEqualTo(1);
+        assertThat(fieldFirstValueAgg.aggForOldSequence(1, 2)).isEqualTo(2);
+    }
+
+    @Test
     public void testFieldListaggAgg() {
         FieldListaggAgg fieldListaggAgg = new FieldListaggAgg(new VarCharType());
         BinaryString accumulator = BinaryString.fromString("user1");

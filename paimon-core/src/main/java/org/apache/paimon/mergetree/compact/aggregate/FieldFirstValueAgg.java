@@ -20,37 +20,44 @@
 
 package org.apache.paimon.mergetree.compact.aggregate;
 
-/** An aggregator which will set null for retraction messages. */
-public class FieldSetNullRetractAgg extends FieldAggregator {
+import org.apache.paimon.types.DataType;
+
+/** first value aggregate a field of a row. */
+public class FieldFirstValueAgg extends FieldAggregator {
+
+    public static final String NAME = "first_value";
 
     private static final long serialVersionUID = 1L;
-    private final FieldAggregator aggregator;
 
-    public FieldSetNullRetractAgg(FieldAggregator aggregator) {
-        super(aggregator.fieldType);
-        this.aggregator = aggregator;
+    private boolean initialized;
+
+    public FieldFirstValueAgg(DataType dataType) {
+        super(dataType);
     }
 
     @Override
     public String name() {
-        return aggregator.name();
+        return NAME;
     }
 
     @Override
     public Object agg(Object accumulator, Object inputField) {
-        return aggregator.agg(accumulator, inputField);
+        if (!initialized) {
+            initialized = true;
+            return inputField;
+        } else {
+            return accumulator;
+        }
     }
 
     @Override
     public Object aggForOldSequence(Object accumulator, Object inputField) {
-        return aggregator.aggForOldSequence(accumulator, inputField);
+        initialized = true;
+        return inputField;
     }
 
     @Override
-    public void reset() {}
-
-    @Override
-    public Object retract(Object accumulator, Object retractField) {
-        return null;
+    public void reset() {
+        this.initialized = false;
     }
 }
