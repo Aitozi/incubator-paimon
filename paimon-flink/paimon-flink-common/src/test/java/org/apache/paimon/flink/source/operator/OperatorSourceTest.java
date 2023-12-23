@@ -23,6 +23,7 @@ import org.apache.paimon.catalog.CatalogContext;
 import org.apache.paimon.catalog.CatalogFactory;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.data.GenericRow;
+import org.apache.paimon.flink.source.align.PlaceholderSplit;
 import org.apache.paimon.flink.utils.MetricUtils;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
@@ -57,7 +58,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.paimon.CoreOptions.CONSUMER_ID;
@@ -215,7 +217,7 @@ public class OperatorSourceTest {
             int c)
             throws Exception {
         Throwable[] error = new Throwable[1];
-        ArrayBlockingQueue<Split> queue = new ArrayBlockingQueue<>(10);
+        BlockingQueue<Split> queue = new LinkedBlockingQueue<>();
 
         DummySourceContext sourceContext =
                 new DummySourceContext() {
@@ -239,7 +241,13 @@ public class OperatorSourceTest {
 
         writeToTable(a, b, c);
 
-        Split split = queue.poll(1, TimeUnit.MINUTES);
+        Split split;
+        while (true) {
+            split = queue.poll(1, TimeUnit.MINUTES);
+            if (!(split instanceof PlaceholderSplit)) {
+                break;
+            }
+        }
         assertThat(readSplit(split)).containsExactlyInAnyOrder(Arrays.asList(a, b, c));
 
         T t = beforeClose.get();

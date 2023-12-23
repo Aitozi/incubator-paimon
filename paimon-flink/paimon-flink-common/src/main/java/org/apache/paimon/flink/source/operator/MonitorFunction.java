@@ -95,6 +95,8 @@ public class MonitorFunction extends RichSourceFunction<Split>
     private transient ListState<Tuple2<Long, Long>> nextSnapshotState;
     private transient TreeMap<Long, Long> nextSnapshotPerCheckpoint;
 
+    private boolean hasSplits;
+
     public MonitorFunction(
             ReadBuilder readBuilder, long monitorInterval, boolean emitSnapshotWatermark) {
         this.readBuilder = readBuilder;
@@ -185,10 +187,12 @@ public class MonitorFunction extends RichSourceFunction<Split>
                 try {
                     List<Split> splits = scan.plan().splits();
                     isEmpty = splits.isEmpty();
-                    if (isEmpty) {
+                    if (isEmpty && hasSplits) {
                         ctx.collect(EMPTY_SPLIT);
+                        this.hasSplits = false;
                     } else {
                         splits.forEach(ctx::collect);
+                        this.hasSplits = true;
                     }
 
                     if (emitSnapshotWatermark) {
