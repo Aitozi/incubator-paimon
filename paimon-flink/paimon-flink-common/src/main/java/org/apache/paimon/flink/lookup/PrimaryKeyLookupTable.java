@@ -89,6 +89,7 @@ public class PrimaryKeyLookupTable extends FullCacheLookupTable {
             throws IOException {
         while (incremental.hasNext()) {
             InternalRow row = incremental.next();
+            System.out.println("insert key: " + row + System.currentTimeMillis());
             primaryKeyRow.replaceRow(row);
             if (orderByLastField) {
                 InternalRow previous = tableState.get(primaryKeyRow);
