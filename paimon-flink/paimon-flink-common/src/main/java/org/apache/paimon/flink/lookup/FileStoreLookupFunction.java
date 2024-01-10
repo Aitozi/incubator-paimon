@@ -179,12 +179,14 @@ public class FileStoreLookupFunction implements Serializable, Closeable {
 
     public Collection<RowData> lookup(RowData keyRow) {
         try {
+            System.out.println("lookup " + keyRow);
             checkRefresh();
             List<InternalRow> results = lookupTable.get(new FlinkRowWrapper(keyRow));
             List<RowData> rows = new ArrayList<>(results.size());
             for (InternalRow matchedRow : results) {
                 rows.add(new FlinkRowData(matchedRow));
             }
+            System.out.println("reult: " + rows.isEmpty());
             return rows;
         } catch (OutOfRangeException e) {
             reopen();
