@@ -25,6 +25,7 @@ import org.apache.flink.types.Row;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Collections;
 import java.util.List;
@@ -56,24 +57,33 @@ public class LookupJoinITCase extends CatalogITCaseBase {
 
         String fullOption = ", 'lookup.cache' = 'full'";
 
-        String lruOption = ", 'changelog-producer'='lookup'";
+        String lruOption = ", 'lookup.cache' = 'partial'";
 
         switch (cacheMode) {
             case FULL:
                 tEnv.executeSql(String.format(dim, fullOption));
                 tEnv.executeSql(String.format(partitioned, fullOption));
                 break;
-            case AUTO:
+            case PARTIAL:
                 tEnv.executeSql(String.format(dim, lruOption));
                 tEnv.executeSql(String.format(partitioned, lruOption));
+                break;
+            case AUTO:
+                // todo
+                //                tEnv.executeSql(String.format(dim, lruOption));
+                //                tEnv.executeSql(String.format(partitioned, lruOption));
                 break;
             default:
                 throw new UnsupportedOperationException();
         }
     }
 
+    private static LookupCacheMode[] getModes() {
+        return new LookupCacheMode[] {LookupCacheMode.PARTIAL, LookupCacheMode.FULL};
+    }
+
     @ParameterizedTest
-    @EnumSource(LookupCacheMode.class)
+    @MethodSource("getModes")
     public void testLookupEmptyTable(LookupCacheMode cacheMode) throws Exception {
         initTable(cacheMode);
         String query =

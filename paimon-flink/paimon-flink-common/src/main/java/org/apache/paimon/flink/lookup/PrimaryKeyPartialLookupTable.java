@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.lookup;
 
+import org.apache.paimon.CoreOptions;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.disk.IOManagerImpl;
@@ -37,9 +38,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.paimon.CoreOptions.MergeEngine.DEDUPLICATE;
 import static org.apache.paimon.CoreOptions.SCAN_BOUNDED_WATERMARK;
 import static org.apache.paimon.CoreOptions.STREAM_SCAN_MODE;
 import static org.apache.paimon.CoreOptions.StreamScanMode.FILE_MONITOR;
@@ -57,6 +60,12 @@ public class PrimaryKeyPartialLookupTable implements LookupTable {
 
     public PrimaryKeyPartialLookupTable(
             FileStoreTable table, int[] projection, File tempPath, List<String> joinKey) {
+
+        if (!new HashSet<>(table.primaryKeys()).equals(new HashSet<>(joinKey))) {
+            throw new UnsupportedOperationException(
+                    "The join key must equal to the primary key in partial cache mode.");
+        }
+
         if (table.partitionKeys().size() > 0) {
             throw new UnsupportedOperationException(
                     "The partitioned table are not supported in partial cache mode.");
@@ -65,6 +74,23 @@ public class PrimaryKeyPartialLookupTable implements LookupTable {
         if (table.bucketMode() != BucketMode.FIXED) {
             throw new UnsupportedOperationException(
                     "Unsupported mode for partial lookup: " + table.bucketMode());
+        }
+
+        CoreOptions options = table.coreOptions();
+        if (options.changelogProducer() != CoreOptions.ChangelogProducer.LOOKUP) {
+            if (options.sequenceField().isPresent()) {
+                throw new UnsupportedOperationException(
+                        String.format(
+                                "Not support sequence field definition, but is: %s. Or you can set lookup changelog producer for the dim table.",
+                                options.sequenceField().get()));
+            }
+
+            if (options.mergeEngine() != DEDUPLICATE) {
+                throw new UnsupportedOperationException(
+                        String.format(
+                                "Only support deduplicate merge engine, but is: %s. Or you can set lookup changelog producer for the dim table.",
+                                options.mergeEngine()));
+            }
         }
 
         this.tableQuery =

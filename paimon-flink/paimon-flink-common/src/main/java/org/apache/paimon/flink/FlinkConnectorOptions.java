@@ -334,6 +334,9 @@ public class FlinkConnectorOptions {
         /** Auto mode, try to use partial mode. */
         AUTO,
 
+        /** Use partial caching mode. */
+        PARTIAL,
+
         /** Use full caching mode. */
         FULL
     }

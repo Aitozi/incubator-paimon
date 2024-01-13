@@ -52,7 +52,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -136,29 +135,37 @@ public class FileStoreLookupFunction implements Serializable, Closeable {
         List<String> fieldNames = table.rowType().getFieldNames();
         int[] projection = projectFields.stream().mapToInt(fieldNames::indexOf).toArray();
         FileStoreTable storeTable = (FileStoreTable) table;
-
-        if (options.get(LOOKUP_CACHE_MODE) == LookupCacheMode.AUTO
-                && new HashSet<>(table.primaryKeys()).equals(new HashSet<>(joinKeys))) {
-            try {
-                this.lookupTable =
-                        new PrimaryKeyPartialLookupTable(storeTable, projection, path, joinKeys);
-            } catch (UnsupportedOperationException ignore) {
-            }
-        }
-
-        if (lookupTable == null) {
-            FullCacheLookupTable.Context context =
-                    new FullCacheLookupTable.Context(
-                            storeTable,
-                            projection,
-                            predicate,
-                            path,
-                            createRecordFilter(projection),
-                            joinKeys);
-            this.lookupTable = FullCacheLookupTable.create(context, options.get(LOOKUP_CACHE_ROWS));
-        }
+        this.lookupTable = createLookupTable(options, storeTable, projection);
 
         lookupTable.open();
+    }
+
+    private LookupTable createLookupTable(
+            Options options, FileStoreTable storeTable, int[] projection) throws Exception {
+        LookupCacheMode mode = options.get(LOOKUP_CACHE_MODE);
+        FullCacheLookupTable.Context context =
+                new FullCacheLookupTable.Context(
+                        storeTable,
+                        projection,
+                        predicate,
+                        path,
+                        createRecordFilter(projection),
+                        joinKeys);
+        switch (mode) {
+            case FULL:
+                return FullCacheLookupTable.create(context, options.get(LOOKUP_CACHE_ROWS));
+            case PARTIAL:
+                return new PrimaryKeyPartialLookupTable(storeTable, projection, path, joinKeys);
+            case AUTO:
+                try {
+                    return new PrimaryKeyPartialLookupTable(storeTable, projection, path, joinKeys);
+                } catch (UnsupportedOperationException e) {
+                    LOG.warn("Partial cache mode does not work because of ", e);
+                    return FullCacheLookupTable.create(context, options.get(LOOKUP_CACHE_ROWS));
+                }
+            default:
+                throw new IllegalArgumentException("Illegal lookup cache mode: " + mode);
+        }
     }
 
     private PredicateFilter createRecordFilter(int[] projection) {
