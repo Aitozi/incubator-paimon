@@ -27,6 +27,7 @@ import org.apache.paimon.io.DataOutputSerializer;
 import org.apache.paimon.lookup.LookupStoreFactory;
 import org.apache.paimon.lookup.LookupStoreReader;
 import org.apache.paimon.lookup.LookupStoreWriter;
+import org.apache.paimon.lookup.bloom.PaimonBloomFilter;
 import org.apache.paimon.memory.MemorySegment;
 import org.apache.paimon.options.MemorySize;
 import org.apache.paimon.reader.RecordReader;
@@ -34,6 +35,7 @@ import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.FileIOUtils;
 import org.apache.paimon.utils.IOFunction;
+import org.apache.paimon.utils.Pair;
 
 import org.apache.paimon.shade.caffeine2.com.github.benmanes.caffeine.cache.Cache;
 import org.apache.paimon.shade.caffeine2.com.github.benmanes.caffeine.cache.Caffeine;
@@ -66,6 +68,7 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
     private final LookupStoreFactory lookupStoreFactory;
 
     private final Cache<String, LookupFile> lookupFiles;
+    private final Cache<String, IndexFile> indexFiles;
 
     public LookupLevels(
             Levels levels,
@@ -92,6 +95,16 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
                         .removalListener(this::removalCallback)
                         .executor(MoreExecutors.directExecutor())
                         .build();
+        // bloom filter 过期配置单独调整 例如64M缓存, 1d的过期时间 ?
+        this.indexFiles =
+                Caffeine.newBuilder()
+                        .expireAfterAccess(fileRetention)
+                        .maximumWeight(maxDiskSize.getKibiBytes())
+                        .weigher(this::fileWeigh)
+                        .removalListener(this::removalCallback)
+                        .executor(MoreExecutors.directExecutor())
+                        .build();
+
         levels.addDropFileCallback(this);
     }
 
@@ -107,6 +120,7 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
     @Override
     public void notifyDropFile(String file) {
         lookupFiles.invalidate(file);
+        indexFiles.invalidate(file);
     }
 
     @Nullable
@@ -127,13 +141,28 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
 
     @Nullable
     private KeyValue lookup(InternalRow key, DataFileMeta file) throws IOException {
+        IndexFile indexFile = indexFiles.getIfPresent(file.fileName());
         LookupFile lookupFile = lookupFiles.getIfPresent(file.fileName());
-        while (lookupFile == null || lookupFile.isClosed) {
-            lookupFile = createLookupFile(file);
-            lookupFiles.put(file.fileName(), lookupFile);
-        }
 
         byte[] keyBytes = keySerializer.serializeToBytes(key);
+        if (indexFile != null && !indexFile.mightContains(keyBytes)) {
+            return null;
+        }
+
+        while (lookupFile == null || lookupFile.isClosed) {
+            // 是不是可以避免创建一次 bloomfilter. 复用前面的
+            Pair<LookupFile, IndexFile> local = createLookupFile(file);
+            lookupFiles.put(file.fileName(), local.getLeft());
+            // 直接更新旧值, 会触发callback吗?
+            indexFiles.put(file.fileName(), local.getRight());
+            indexFile = local.getRight();
+            lookupFile = local.getLeft();
+        }
+
+        if (!indexFile.mightContains(keyBytes)) {
+            return null;
+        }
+
         byte[] valueBytes = lookupFile.get(keyBytes);
         if (valueBytes == null) {
             return null;
@@ -146,11 +175,11 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
                 .setLevel(lookupFile.remoteFile().level());
     }
 
-    private int fileWeigh(String file, LookupFile lookupFile) {
+    private int fileWeigh(String file, CacheFile lookupFile) {
         return fileKibiBytes(lookupFile.localFile);
     }
 
-    private void removalCallback(String key, LookupFile file, RemovalCause cause) {
+    private void removalCallback(String key, CacheFile file, RemovalCause cause) {
         if (file != null) {
             try {
                 file.close();
@@ -160,11 +189,16 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
         }
     }
 
-    private LookupFile createLookupFile(DataFileMeta file) throws IOException {
+    private Pair<LookupFile, IndexFile> createLookupFile(DataFileMeta file) throws IOException {
         File localFile = localFileFactory.get();
+        File indexFile = new File(localFile.getAbsolutePath() + ".bf");
         if (!localFile.createNewFile()) {
             throw new IOException("Can not create new file: " + localFile);
         }
+        if (!indexFile.createNewFile()) {
+            throw new IOException("Can not create new file: " + localFile);
+        }
+        PaimonBloomFilter bloomFilter = new PaimonBloomFilter(indexFile, file.rowCount());
         try (LookupStoreWriter kvWriter = lookupStoreFactory.createWriter(localFile);
                 RecordReader<KeyValue> reader = fileReaderFactory.apply(file)) {
             DataOutputSerializer valueOut = new DataOutputSerializer(32);
@@ -179,15 +213,20 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
                     valueOut.writeByte(kv.valueKind().toByteValue());
                     byte[] valueBytes = valueOut.getCopyOfBuffer();
                     kvWriter.put(keyBytes, valueBytes);
+                    bloomFilter.add(keyBytes);
                 }
                 batch.releaseBatch();
             }
         } catch (IOException e) {
             FileIOUtils.deleteFileOrDirectory(localFile);
+            FileIOUtils.deleteFileOrDirectory(indexFile);
             throw e;
         }
+        bloomFilter.finish();
 
-        return new LookupFile(localFile, file, lookupStoreFactory.createReader(localFile));
+        return Pair.of(
+                new LookupFile(localFile, file, lookupStoreFactory.createReader(localFile)),
+                new IndexFile(indexFile, file));
     }
 
     @Override
@@ -195,17 +234,50 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
         lookupFiles.invalidateAll();
     }
 
-    private static class LookupFile implements Closeable {
-
+    public static class CacheFile implements Closeable {
         private final File localFile;
         private final DataFileMeta remoteFile;
-        private final LookupStoreReader reader;
 
-        private boolean isClosed = false;
+        protected boolean isClosed = false;
 
-        public LookupFile(File localFile, DataFileMeta remoteFile, LookupStoreReader reader) {
+        public CacheFile(File localFile, DataFileMeta remoteFile) {
             this.localFile = localFile;
             this.remoteFile = remoteFile;
+        }
+
+        public DataFileMeta remoteFile() {
+            return remoteFile;
+        }
+
+        @Override
+        public void close() throws IOException {
+            isClosed = true;
+            FileIOUtils.deleteFileOrDirectory(localFile);
+        }
+    }
+
+    private static class IndexFile extends CacheFile {
+
+        private PaimonBloomFilter.BloomFilterReader reader;
+
+        public IndexFile(File localFile, DataFileMeta remoteFile) throws IOException {
+            super(localFile, remoteFile);
+            this.reader = PaimonBloomFilter.createReader(localFile);
+        }
+
+        @Nullable
+        public boolean mightContains(byte[] key) throws IOException {
+            checkArgument(!isClosed);
+            return reader.mightContains(key);
+        }
+    }
+
+    private static class LookupFile extends CacheFile {
+
+        private final LookupStoreReader reader;
+
+        public LookupFile(File localFile, DataFileMeta remoteFile, LookupStoreReader reader) {
+            super(localFile, remoteFile);
             this.reader = reader;
         }
 
@@ -215,15 +287,10 @@ public class LookupLevels implements Levels.DropFileCallback, Closeable {
             return reader.lookup(key);
         }
 
-        public DataFileMeta remoteFile() {
-            return remoteFile;
-        }
-
         @Override
         public void close() throws IOException {
             reader.close();
-            isClosed = true;
-            FileIOUtils.deleteFileOrDirectory(localFile);
+            super.close();
         }
     }
 }
