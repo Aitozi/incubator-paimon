@@ -1119,6 +1119,15 @@ public class PreAggregationITCase {
         }
 
         @Test
+        public void testUnOrderInput2() {
+            batchSql("INSERT INTO T VALUES (1, 4, '4', '4', '4')");
+            batchSql("INSERT INTO T VALUES (1, 2, '2', '2', '2')");
+            batchSql("INSERT INTO T VALUES (1, 3, '3', '3', '3')");
+            List<Row> result = batchSql("SELECT * FROM T");
+            assertThat(result).containsExactlyInAnyOrder(Row.of(1, 2, "2", "2", "2"));
+        }
+
+        @Test
         public void testMergeRead() {
             batchSql(
                     "INSERT INTO T VALUES (1, 1, CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR), CAST(NULL AS VARCHAR))");

@@ -212,7 +212,7 @@ Current supported aggregate functions and data types are:
   It supports BOOLEAN data type.
 
 * `first_value`:
-  The first_value function retrieves the first null value from a data set.
+  The first_value function retrieves the first value from a data set.
   It supports all data types.
 
 * `first_non_null_value`:
