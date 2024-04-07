@@ -1497,6 +1497,13 @@ public class PrimaryKeyFileStoreTableTest extends FileStoreTableTestBase {
         List<java.nio.file.Path> files =
                 Files.walk(new File(tablePath.toUri().getPath()).toPath())
                         .collect(Collectors.toList());
+        if (files.size() != 19) {
+            System.out.println(
+                    files.stream()
+                            .map(p -> p.toAbsolutePath().toString())
+                            .collect(Collectors.joining("\n")));
+            throw new RuntimeException();
+        }
         assertThat(files.size()).isEqualTo(19);
         // rollback snapshot case testRollbackToSnapshotCase0 plus 4:
         // table-path/tag/tag-test1
