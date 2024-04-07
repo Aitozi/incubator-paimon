@@ -585,6 +585,7 @@ public class OrphanFilesCleanTest {
 
     private void addNonUsedFiles(Path dir, int fileNum, List<String> fileNamePrefix)
             throws IOException {
+        System.out.println("add non used files");
         for (int i = 0; i < fileNum; i++) {
             String fileName =
                     fileNamePrefix.get(RANDOM.nextInt(fileNamePrefix.size())) + UUID.randomUUID();
@@ -592,7 +593,12 @@ public class OrphanFilesCleanTest {
             if (RANDOM.nextBoolean()) {
                 fileIO.writeFileUtf8(file, "");
             } else {
-                fileIO.mkdirs(file);
+                if (!fileIO.mkdirs(file)) {
+                    throw new RuntimeException("Failed to ");
+                }
+            }
+            if (!fileIO.exists(file)) {
+                System.out.println("failed to create file " + file.toUri().getPath());
             }
             manuallyAddedFiles.add(file);
         }
