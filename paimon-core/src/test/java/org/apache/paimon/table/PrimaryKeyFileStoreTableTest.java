@@ -64,6 +64,7 @@ import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.CompatibilityTestUtils;
 
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -1456,7 +1457,7 @@ public class PrimaryKeyFileStoreTableTest extends FileStoreTableTestBase {
                                 "1|2|200|binary|varbinary|mapKey:mapVal|multiset"));
     }
 
-    @Test
+    @RepeatedTest(100)
     public void testRollbackToTagWithChangelogDecoupled() throws Exception {
         int commitTimes = ThreadLocalRandom.current().nextInt(100) + 5;
         FileStoreTable table =
@@ -1497,6 +1498,13 @@ public class PrimaryKeyFileStoreTableTest extends FileStoreTableTestBase {
         List<java.nio.file.Path> files =
                 Files.walk(new File(tablePath.toUri().getPath()).toPath())
                         .collect(Collectors.toList());
+        if (files.size() != 19) {
+            System.out.println(
+                    files.stream()
+                            .map(p -> p.toAbsolutePath().toString())
+                            .collect(Collectors.joining("\n")));
+            throw new RuntimeException();
+        }
         assertThat(files.size()).isEqualTo(19);
         // rollback snapshot case testRollbackToSnapshotCase0 plus 4:
         // table-path/tag/tag-test1

@@ -57,6 +57,7 @@ import org.apache.paimon.utils.StringUtils;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -328,7 +329,7 @@ public class OrphanFilesCleanTest {
         assertThat(result).containsExactlyInAnyOrderElementsOf(TestPojo.formatData(data));
     }
 
-    @Test
+    @RepeatedTest(100)
     public void testCleanOrphanFilesWithChangelogDecoupled() throws Exception {
         // recreate the table with another option
         this.write.close();
