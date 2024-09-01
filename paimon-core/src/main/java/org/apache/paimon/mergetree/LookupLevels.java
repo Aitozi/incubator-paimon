@@ -50,6 +50,8 @@ import java.io.UncheckedIOException;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -66,6 +68,7 @@ public class LookupLevels<T> implements Levels.DropFileCallback, Closeable {
     private final Levels levels;
     private final Comparator<InternalRow> keyComparator;
     private final RowCompactedSerializer keySerializer;
+    private final InternalRow.FieldGetter[] keyGetters;
     private final ValueProcessor<T> valueProcessor;
     private final IOFunction<DataFileMeta, RecordReader<KeyValue>> fileReaderFactory;
     private final Supplier<File> localFileFactory;
@@ -87,6 +90,7 @@ public class LookupLevels<T> implements Levels.DropFileCallback, Closeable {
         this.levels = levels;
         this.keyComparator = keyComparator;
         this.keySerializer = new RowCompactedSerializer(keyType);
+        this.keyGetters = keyType.fieldGetters();
         this.valueProcessor = valueProcessor;
         this.fileReaderFactory = fileReaderFactory;
         this.localFileFactory = localFileFactory;
@@ -177,8 +181,18 @@ public class LookupLevels<T> implements Levels.DropFileCallback, Closeable {
             KeyValue kv;
             if (valueProcessor.withPosition()) {
                 FileRecordIterator<KeyValue> batch;
+                Set<String> key = new HashSet<>();
                 while ((batch = (FileRecordIterator<KeyValue>) reader.readBatch()) != null) {
                     while ((kv = batch.next()) != null) {
+                        StringBuilder builder = new StringBuilder();
+                        for (InternalRow.FieldGetter keyGetter : keyGetters) {
+                            builder.append("|");
+                            builder.append(keyGetter.getFieldOrNull(kv.key()));
+                        }
+                        System.out.printf("debug: %s - %s%n", file.fileName(), builder);
+                        if (!key.add(builder.toString())) {
+                            throw new IOException("Duplicate key: " + builder);
+                        }
                         byte[] keyBytes = keySerializer.serializeToBytes(kv.key());
                         byte[] valueBytes =
                                 valueProcessor.persistToDisk(kv, batch.returnedPosition());
