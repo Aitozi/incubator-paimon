@@ -25,7 +25,8 @@ public class DeletionVectorITCase extends CatalogITCaseBase {
                         + "    'manifest.target-file-size' = '32mb',"
                         + "    'sink.parallelism' = '4',"
                         + "    'snapshot.expire.execution-mode' = 'async',"
-                        + "    'deletion-vectors.enabled' = 'true'"
+                        + "    'deletion-vectors.enabled' = 'false',"
+                        + "    'file.format' = 'orc'"
                         + ")");
 
         sEnv.executeSql(

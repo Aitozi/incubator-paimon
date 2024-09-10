@@ -68,6 +68,7 @@ public class KeyValueDataFileWriter
     private long minSeqNumber = Long.MAX_VALUE;
     private long maxSeqNumber = Long.MIN_VALUE;
     private long deleteRecordCount = 0;
+    private InternalRow.FieldGetter[] keyGetters;
 
     public KeyValueDataFileWriter(
             FileIO fileIO,
@@ -100,10 +101,18 @@ public class KeyValueDataFileWriter
         this.keyStatsConverter = new FieldStatsArraySerializer(keyType);
         this.valueStatsConverter = new FieldStatsArraySerializer(valueType);
         this.keySerializer = new InternalRowSerializer(keyType);
+        this.keyGetters = keyType.fieldGetters();
     }
 
     @Override
     public void write(KeyValue kv) throws IOException {
+        InternalRow key = kv.key();
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < key.getFieldCount(); i++) {
+            builder.append("|");
+            builder.append(keyGetters[i].getFieldOrNull(key));
+        }
+        System.out.printf("write key: %s to %s%n", builder, path.getName());
         super.write(kv);
 
         updateMinKey(kv);

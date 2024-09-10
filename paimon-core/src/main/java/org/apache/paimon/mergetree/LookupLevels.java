@@ -189,7 +189,9 @@ public class LookupLevels<T> implements Levels.DropFileCallback, Closeable {
                             builder.append("|");
                             builder.append(keyGetter.getFieldOrNull(kv.key()));
                         }
-                        System.out.printf("debug: %s - %s%n", file.fileName(), builder);
+                        System.out.printf(
+                                "debug: %s - %s level: %s%n",
+                                file.fileName(), builder, file.level());
                         if (!key.add(builder.toString())) {
                             throw new IOException("Duplicate key: " + builder);
                         }

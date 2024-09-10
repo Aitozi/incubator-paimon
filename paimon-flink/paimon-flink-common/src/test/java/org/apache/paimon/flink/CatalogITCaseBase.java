@@ -70,6 +70,7 @@ public abstract class CatalogITCaseBase extends AbstractTestBase {
         tEnv = tableEnvironmentBuilder().batchMode().build();
         String catalog = "PAIMON";
         path = getTempDirPath();
+        System.out.println("path----------: " + path);
         String inferScan =
                 !inferScanParallelism() ? ",\n'table-default.scan.infer-parallelism'='false'" : "";
 

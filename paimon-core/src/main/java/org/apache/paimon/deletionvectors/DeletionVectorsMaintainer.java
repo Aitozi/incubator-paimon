@@ -69,6 +69,8 @@ public class DeletionVectorsMaintainer {
     public void notifyNewDeletion(String fileName, long position) {
         DeletionVector deletionVector =
                 deletionVectors.computeIfAbsent(fileName, k -> new BitmapDeletionVector());
+        System.out.printf(
+                "notify new deletion: %s %s %n", fileName, Thread.currentThread().getName());
         if (deletionVector.checkedDelete(position)) {
             modified = true;
         }
@@ -111,6 +113,7 @@ public class DeletionVectorsMaintainer {
      *     Optional} if not.
      */
     public Optional<DeletionVector> deletionVectorOf(String fileName) {
+        System.out.println("Get deletion vector: " + fileName + Thread.currentThread().getName());
         return Optional.ofNullable(deletionVectors.get(fileName));
     }
 
