@@ -55,7 +55,7 @@ public class SystemCatalogTable implements CatalogTable {
     public Schema getUnresolvedSchema() {
         Schema.Builder builder = Schema.newBuilder();
         builder.fromRowDataType(
-                TypeConversions.fromLogicalToDataType(toLogicalType(table.rowType())));
+                TypeConversions.fromLogicalToDataType(toLogicalType(table.outerRowType())));
         if (table instanceof AuditLogTable) {
             Map<String, String> newOptions = new HashMap<>(table.options());
             if (newOptions.keySet().stream()

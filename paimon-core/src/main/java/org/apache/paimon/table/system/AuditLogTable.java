@@ -23,6 +23,8 @@ import org.apache.paimon.Snapshot;
 import org.apache.paimon.consumer.ConsumerManager;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.BinaryString;
+import org.apache.paimon.data.GenericArray;
+import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.disk.IOManager;
 import org.apache.paimon.fs.FileIO;
@@ -38,12 +40,14 @@ import org.apache.paimon.predicate.LeafPredicate;
 import org.apache.paimon.predicate.Predicate;
 import org.apache.paimon.predicate.PredicateBuilder;
 import org.apache.paimon.predicate.PredicateReplaceVisitor;
+import org.apache.paimon.reader.PackChangelogReader;
 import org.apache.paimon.reader.RecordReader;
 import org.apache.paimon.table.DataTable;
 import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.ReadonlyTable;
 import org.apache.paimon.table.SpecialFields;
 import org.apache.paimon.table.Table;
+import org.apache.paimon.table.source.DataSplit;
 import org.apache.paimon.table.source.DataTableScan;
 import org.apache.paimon.table.source.InnerTableRead;
 import org.apache.paimon.table.source.InnerTableScan;
@@ -54,12 +58,14 @@ import org.apache.paimon.table.source.StreamDataTableScan;
 import org.apache.paimon.table.source.TableRead;
 import org.apache.paimon.table.source.snapshot.SnapshotReader;
 import org.apache.paimon.table.source.snapshot.StartingContext;
+import org.apache.paimon.types.ArrayType;
 import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.RowKind;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.BranchManager;
 import org.apache.paimon.utils.FileStorePathFactory;
 import org.apache.paimon.utils.Filter;
+import org.apache.paimon.utils.Preconditions;
 import org.apache.paimon.utils.ProjectedRow;
 import org.apache.paimon.utils.SimpleFileReader;
 import org.apache.paimon.utils.SnapshotManager;
@@ -143,6 +149,28 @@ public class AuditLogTable implements DataTable, ReadonlyTable {
     }
 
     @Override
+    public RowType outerRowType() {
+        if (coreOptions()
+                .toConfiguration()
+                .get(CoreOptions.STREAMING_READ_PACK_CHANGELOG_ENABLED)) {
+            List<DataField> fields = new ArrayList<>();
+            fields.add(SpecialFields.ROW_KIND);
+            for (DataField field : wrapped.rowType().getFields()) {
+                DataField newField =
+                        new DataField(
+                                field.id(),
+                                field.name(),
+                                new ArrayType(field.type().nullable()), // convert to nullable
+                                field.description());
+                fields.add(newField);
+            }
+            return new RowType(fields);
+        } else {
+            return rowType();
+        }
+    }
+
+    @Override
     public List<String> partitionKeys() {
         return wrapped.partitionKeys();
     }
@@ -204,7 +232,11 @@ public class AuditLogTable implements DataTable, ReadonlyTable {
 
     @Override
     public InnerTableRead newRead() {
-        return new AuditLogRead(wrapped.newRead());
+        return new AuditLogRead(
+                wrapped.newRead(),
+                coreOptions()
+                        .toConfiguration()
+                        .get(CoreOptions.STREAMING_READ_PACK_CHANGELOG_ENABLED));
     }
 
     @Override
@@ -532,9 +564,12 @@ public class AuditLogTable implements DataTable, ReadonlyTable {
 
         private int[] readProjection;
 
-        private AuditLogRead(InnerTableRead dataRead) {
+        private final boolean enablePack;
+
+        private AuditLogRead(InnerTableRead dataRead, boolean enablePack) {
             this.dataRead = dataRead.forceKeepDelete();
             this.readProjection = defaultProjection();
+            this.enablePack = enablePack;
         }
 
         /** Default projection, just add row kind to the first. */
@@ -591,11 +626,26 @@ public class AuditLogTable implements DataTable, ReadonlyTable {
 
         @Override
         public RecordReader<InternalRow> createReader(Split split) throws IOException {
-            return dataRead.createReader(split).transform(this::convertRow);
+            DataSplit dataSplit = (DataSplit) split;
+            // So the full scan with pack changelog is not supported.
+            Preconditions.checkArgument(
+                    dataSplit.isStreaming() || !enablePack,
+                    "The changelog pack should only enabled for streaming mode.");
+            if (dataSplit.isStreaming() && enablePack) {
+                return new PackChangelogReader(
+                        dataRead.createReader(split), this::packRows, wrapped.rowType());
+            } else {
+                return dataRead.createReader(split).transform(this::convertRow);
+            }
         }
 
         private InternalRow convertRow(InternalRow data) {
             return new AuditLogRow(readProjection, data);
+        }
+
+        private InternalRow packRows(InternalRow data, InternalRow row2) {
+            return new PackedAuditLogRow(
+                    readProjection, data, row2, wrapped.rowType().fieldGetters());
         }
     }
 
@@ -633,6 +683,35 @@ public class AuditLogTable implements DataTable, ReadonlyTable {
                 return BinaryString.fromString(row.getRowKind().shortString());
             }
             return super.getString(pos);
+        }
+    }
+
+    /** A {@link ProjectedRow} which returns row kind when mapping index is negative. */
+    private static class PackedAuditLogRow extends AuditLogRow {
+
+        private PackedAuditLogRow(
+                int[] indexMapping, InternalRow row, InternalRow row2, FieldGetter[] fieldGetters) {
+            super(indexMapping, convertToArray(row, row2, fieldGetters));
+        }
+
+        private static InternalRow convertToArray(
+                InternalRow row1, InternalRow row2, FieldGetter[] fieldGetters) {
+            GenericRow row = new GenericRow(row1.getFieldCount());
+            for (int i = 0; i < row1.getFieldCount(); i++) {
+                Object o1 = fieldGetters[i].getFieldOrNull(row1);
+                Object o2 = null;
+                if (row2 != null) {
+                    o2 = fieldGetters[i].getFieldOrNull(row2);
+                }
+                row.setField(i, new GenericArray(new Object[] {o1, o2}));
+            }
+            // If no row2 provided, then follow the row1 kind.
+            if (row2 == null) {
+                row.setRowKind(row1.getRowKind());
+            } else {
+                row.setRowKind(row2.getRowKind());
+            }
+            return row;
         }
     }
 }

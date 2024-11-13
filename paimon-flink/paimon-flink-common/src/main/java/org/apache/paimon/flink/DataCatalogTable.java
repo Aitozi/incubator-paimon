@@ -62,7 +62,7 @@ public class DataCatalogTable extends CatalogTableImpl {
     public Schema getUnresolvedSchema() {
         // add physical column comments
         Map<String, String> columnComments =
-                table.rowType().getFields().stream()
+                table.outerRowType().getFields().stream()
                         .filter(dataField -> dataField.description() != null)
                         .collect(Collectors.toMap(DataField::name, DataField::description));
 

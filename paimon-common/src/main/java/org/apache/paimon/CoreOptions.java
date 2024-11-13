@@ -720,6 +720,13 @@ public class CoreOptions implements Serializable {
                                     + "Note: Scale-up this parameter will increase memory usage while scanning manifest files. "
                                     + "We can consider downsize it when we encounter an out of memory exception while scanning");
 
+    public static final ConfigOption<Boolean> STREAMING_READ_PACK_CHANGELOG_ENABLED =
+            key("streaming.read.pack-changelog.enabled")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to pack the update before and after message together when streaming reading.");
+
     public static final ConfigOption<Duration> STREAMING_READ_SNAPSHOT_DELAY =
             key("streaming.read.snapshot.delay")
                     .durationType()

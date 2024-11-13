@@ -59,6 +59,14 @@ public interface Table extends Serializable {
     /** Returns the row type of this table. */
     RowType rowType();
 
+    /**
+     * Returns the outer row type of this table. Which means the actual output row type of this
+     * table.
+     */
+    default RowType outerRowType() {
+        return rowType();
+    }
+
     /** Partition keys of this table. */
     List<String> partitionKeys();
 

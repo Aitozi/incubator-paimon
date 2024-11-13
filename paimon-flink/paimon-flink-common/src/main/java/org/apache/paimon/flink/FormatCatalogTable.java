@@ -58,7 +58,7 @@ public class FormatCatalogTable implements CatalogTable {
     @Override
     public Schema getUnresolvedSchema() {
         return Schema.newBuilder()
-                .fromRowDataType(fromLogicalToDataType(toLogicalType(table.rowType())))
+                .fromRowDataType(fromLogicalToDataType(toLogicalType(table.outerRowType())))
                 .build();
     }
 

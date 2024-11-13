@@ -32,6 +32,7 @@ import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.PartitionNotExistException;
 import org.apache.flink.table.catalog.exceptions.TableNotPartitionedException;
 import org.apache.flink.types.Row;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import javax.annotation.Nonnull;
@@ -130,6 +131,21 @@ public class CatalogTableITCase extends CatalogITCaseBase {
                         Row.of(1L, 0L, "APPEND"),
                         Row.of(2L, 0L, "APPEND"),
                         Row.of(3L, 0L, "APPEND"));
+    }
+
+    @Test
+    public void testAuditTablePackChangelog() throws Exception {
+        sql(
+                "CREATE TABLE T (a INT, b INT, primary key (a) NOT ENFORCED) with ('changelog-producer' = 'lookup', 'bucket' = '2', 'streaming.read.pack-changelog.enabled' = 'true')");
+        BlockingIterator<Row, Row> iterator =
+                streamSqlBlockIter(
+                        "SELECT * FROM T$audit_log /*+ OPTIONS('scan.mode' = 'latest') */");
+        sql("INSERT INTO T VALUES (1, 2)");
+        sql("INSERT INTO T VALUES (1, 3)");
+        sql("INSERT INTO T VALUES (2, 2)");
+        List<Row> rows = iterator.collect(3);
+        assertThat(rows).containsExactly(Row.of("+I"));
+        iterator.close();
     }
 
     @Test
