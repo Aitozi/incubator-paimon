@@ -47,6 +47,7 @@ public class ObjectsCacheTest {
         ObjectsCache<String, String> cache =
                 new ObjectsCache<>(
                         new SegmentsCache<>(1024, MemorySize.ofKibiBytes(5), Long.MAX_VALUE),
+                        null,
                         new StringSerializer(),
                         RowType.of(DataTypes.STRING()),
                         k -> 1L,

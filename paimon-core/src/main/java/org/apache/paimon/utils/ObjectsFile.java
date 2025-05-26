@@ -50,6 +50,7 @@ public class ObjectsFile<T> implements SimpleFileReader<T> {
     protected final PathFactory pathFactory;
 
     @Nullable private final ObjectsCache<Path, T> cache;
+    @Nullable private final FilesCache<Path> filesCache;
 
     public ObjectsFile(
             FileIO fileIO,
@@ -60,6 +61,28 @@ public class ObjectsFile<T> implements SimpleFileReader<T> {
             String compression,
             PathFactory pathFactory,
             @Nullable SegmentsCache<Path> cache) {
+        this(
+                fileIO,
+                serializer,
+                formatType,
+                readerFactory,
+                writerFactory,
+                compression,
+                pathFactory,
+                cache,
+                null);
+    }
+
+    public ObjectsFile(
+            FileIO fileIO,
+            ObjectSerializer<T> serializer,
+            RowType formatType,
+            FormatReaderFactory readerFactory,
+            FormatWriterFactory writerFactory,
+            String compression,
+            PathFactory pathFactory,
+            @Nullable SegmentsCache<Path> cache,
+            @Nullable FilesCache<Path> filesCache) {
         this.fileIO = fileIO;
         this.serializer = serializer;
         this.readerFactory = readerFactory;
@@ -75,6 +98,7 @@ public class ObjectsFile<T> implements SimpleFileReader<T> {
                                 formatType,
                                 this::fileSize,
                                 this::createIterator);
+        this.filesCache = filesCache;
     }
 
     public ObjectsFile<T> withCacheMetrics(@Nullable CacheMetrics cacheMetrics) {
@@ -145,12 +169,18 @@ public class ObjectsFile<T> implements SimpleFileReader<T> {
             Filter<T> readTFilter)
             throws IOException {
         Path path = pathFactory.toPath(fileName);
+        FileIO io = fileIO;
         if (cache != null) {
             return cache.read(path, fileSize, loadFilter, readFilter, readTFilter);
+        } else if (filesCache != null) {
+            FilesCache.CachedFile cachedFile = filesCache.get(path);
+            path = new Path(cachedFile.file.getAbsolutePath());
+            fileSize = cachedFile.size;
+            io = filesCache.getCachedFileIO();
         }
 
         return readFromIterator(
-                createIterator(path, fileSize), serializer, readFilter, readTFilter);
+                createIterator(path, fileSize, io), serializer, readFilter, readTFilter);
     }
 
     public String writeWithoutRolling(Collection<T> records) {
@@ -182,6 +212,11 @@ public class ObjectsFile<T> implements SimpleFileReader<T> {
 
     private CloseableIterator<InternalRow> createIterator(Path file, @Nullable Long fileSize)
             throws IOException {
+        return createIterator(file, fileSize, fileIO);
+    }
+
+    private CloseableIterator<InternalRow> createIterator(
+            Path file, @Nullable Long fileSize, FileIO fileIO) throws IOException {
         return FileUtils.createFormatReader(fileIO, readerFactory, file, fileSize)
                 .toCloseableIterator();
     }
