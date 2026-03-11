@@ -59,6 +59,7 @@ import org.apache.paimon.utils.CatalogBranchManager;
 import org.apache.paimon.utils.ChangelogManager;
 import org.apache.paimon.utils.DVMetaCache;
 import org.apache.paimon.utils.FileSystemBranchManager;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.Preconditions;
 import org.apache.paimon.utils.SegmentsCache;
 import org.apache.paimon.utils.SimpleFileReader;
@@ -94,6 +95,7 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
     protected final CatalogEnvironment catalogEnvironment;
 
     @Nullable protected transient SegmentsCache<Path> manifestCache;
+    @Nullable protected transient FilesCache manifestFileCache;
     @Nullable protected transient Cache<Path, Snapshot> snapshotCache;
     @Nullable protected transient Cache<String, Statistics> statsCache;
     @Nullable protected transient DVMetaCache dvmetaCache;
@@ -123,6 +125,12 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
     public void setManifestCache(SegmentsCache<Path> manifestCache) {
         this.manifestCache = manifestCache;
         store().setManifestCache(manifestCache);
+    }
+
+    @Override
+    public void setManifestFileCache(FilesCache filesCache) {
+        this.manifestFileCache = filesCache;
+        store().setManifestFileCache(filesCache);
     }
 
     @Nullable
@@ -402,6 +410,9 @@ abstract class AbstractFileStoreTable implements FileStoreTable {
         }
         if (manifestCache != null) {
             copied.setManifestCache(manifestCache);
+        }
+        if (manifestFileCache != null) {
+            copied.setManifestFileCache(manifestFileCache);
         }
         if (statsCache != null) {
             copied.setStatsCache(statsCache);

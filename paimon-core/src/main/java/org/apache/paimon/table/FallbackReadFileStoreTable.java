@@ -48,6 +48,7 @@ import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.Filter;
 import org.apache.paimon.utils.Preconditions;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.SegmentsCache;
 
 import org.slf4j.Logger;
@@ -132,6 +133,12 @@ public class FallbackReadFileStoreTable extends DelegatedFileStoreTable {
     public void setManifestCache(SegmentsCache<Path> manifestCache) {
         super.setManifestCache(manifestCache);
         fallback.setManifestCache(manifestCache);
+    }
+
+    @Override
+    public void setManifestFileCache(FilesCache filesCache) {
+        super.setManifestFileCache(filesCache);
+        fallback.setManifestFileCache(filesCache);
     }
 
     protected FileStoreTable switchWrappedToBranch(String branchName) {

@@ -42,6 +42,7 @@ import org.apache.paimon.tag.TagAutoManager;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.ChangelogManager;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.InternalRowPartitionComputer;
 import org.apache.paimon.utils.SegmentsCache;
 import org.apache.paimon.utils.SnapshotManager;
@@ -123,6 +124,8 @@ public interface FileStore<T> {
     List<TagCallback> createTagCallbacks(FileStoreTable table);
 
     void setManifestCache(SegmentsCache<Path> manifestCache);
+
+    void setManifestFileCache(FilesCache filesCache);
 
     void setSnapshotCache(Cache<Path, Snapshot> cache);
 

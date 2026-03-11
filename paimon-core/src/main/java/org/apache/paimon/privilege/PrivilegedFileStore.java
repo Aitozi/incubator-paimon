@@ -46,6 +46,7 @@ import org.apache.paimon.tag.TagAutoManager;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.ChangelogManager;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.InternalRowPartitionComputer;
 import org.apache.paimon.utils.SegmentsCache;
 import org.apache.paimon.utils.SnapshotManager;
@@ -233,6 +234,11 @@ public class PrivilegedFileStore<T> implements FileStore<T> {
     @Override
     public void setManifestCache(SegmentsCache<Path> manifestCache) {
         wrapped.setManifestCache(manifestCache);
+    }
+
+    @Override
+    public void setManifestFileCache(FilesCache filesCache) {
+        wrapped.setManifestFileCache(filesCache);
     }
 
     @Override

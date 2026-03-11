@@ -25,11 +25,14 @@ import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.FileIOFinder;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.local.LocalFileIO;
+import org.apache.paimon.options.MemorySize;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaManager;
 import org.apache.paimon.stats.StatsTestUtils;
+import org.apache.paimon.utils.CountingFileIO;
 import org.apache.paimon.utils.FailingFileIO;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
@@ -88,6 +91,28 @@ public class ManifestFileTest {
     }
 
     @Test
+    public void testReadManifestWithLocalFilesCache() throws IOException {
+        CountingFileIO fileIO = new CountingFileIO();
+        Path cachePath = new Path(tempDir.resolve("manifest-cache").toUri());
+        FilesCache filesCache =
+                new FilesCache(MemorySize.ofMebiBytes(10), cachePath, LocalFileIO.create());
+        ManifestFile manifestFile = createManifestFile(tempDir.toString(), fileIO, filesCache);
+
+        List<ManifestFileMeta> actualMetas = manifestFile.write(generateData());
+        ManifestFileMeta firstMeta = actualMetas.get(0);
+
+        List<ManifestEntry> firstRead = manifestFile.read(firstMeta.fileName(), firstMeta.fileSize());
+        assertThat(fileIO.inputStreamCount()).isEqualTo(1);
+
+        List<ManifestEntry> secondRead = manifestFile.read(firstMeta.fileName(), firstMeta.fileSize());
+        assertThat(secondRead).isEqualTo(firstRead);
+        assertThat(fileIO.inputStreamCount()).isEqualTo(1);
+        assertThat(LocalFileIO.create().listStatus(cachePath)).isNotEmpty();
+
+        filesCache.close();
+    }
+
+    @Test
     void testManifestCreationTimeTimestamp() {
         List<ManifestEntry> entries = generateData();
         ManifestFile manifestFile = createManifestFile(tempDir.toString());
@@ -129,6 +154,11 @@ public class ManifestFileTest {
     }
 
     private ManifestFile createManifestFile(String pathStr) {
+        return createManifestFile(pathStr, FileIOFinder.find(new Path(pathStr)), null);
+    }
+
+    private ManifestFile createManifestFile(
+            String pathStr, FileIO fileIO, FilesCache filesCache) {
         Path path = new Path(pathStr);
         FileStorePathFactory pathFactory =
                 new FileStorePathFactory(
@@ -148,7 +178,6 @@ public class ManifestFileTest {
                         false,
                         null);
         int suggestedFileSize = ThreadLocalRandom.current().nextInt(8192) + 1024;
-        FileIO fileIO = FileIOFinder.find(path);
         return new ManifestFile.Factory(
                         fileIO,
                         new SchemaManager(fileIO, path),
@@ -157,7 +186,8 @@ public class ManifestFileTest {
                         "zstd",
                         pathFactory,
                         suggestedFileSize,
-                        null)
+                        null,
+                        filesCache)
                 .create();
     }
 

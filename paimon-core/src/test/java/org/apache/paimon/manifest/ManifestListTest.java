@@ -21,13 +21,17 @@ package org.apache.paimon.manifest;
 import org.apache.paimon.CoreOptions;
 import org.apache.paimon.TestKeyValueGenerator;
 import org.apache.paimon.format.FileFormat;
+import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.FileIOFinder;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.local.LocalFileIO;
+import org.apache.paimon.options.MemorySize;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.utils.CountingFileIO;
 import org.apache.paimon.utils.FailingFileIO;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.VersionedObjectSerializer;
 
 import org.junit.jupiter.api.RepeatedTest;
@@ -84,6 +88,26 @@ public class ManifestListTest {
 
         String manifestListName = manifestList.write(metas).getKey();
         assertThat(manifestListName.startsWith("manifest-list-")).isTrue();
+    }
+
+    @Test
+    public void testReadManifestListWithLocalFilesCache() throws Exception {
+        CountingFileIO fileIO = new CountingFileIO();
+        Path cachePath = new Path(tempDir.resolve("manifest-list-cache").toUri());
+        FilesCache filesCache =
+                new FilesCache(MemorySize.ofMebiBytes(10), cachePath, LocalFileIO.create());
+        ManifestList manifestList = createManifestList(tempDir.toString(), fileIO, filesCache);
+
+        String manifestListName = manifestList.write(generateData()).getKey();
+        List<ManifestFileMeta> firstRead = manifestList.read(manifestListName);
+        assertThat(fileIO.inputStreamCount()).isEqualTo(1);
+
+        List<ManifestFileMeta> secondRead = manifestList.read(manifestListName);
+        assertThat(secondRead).isEqualTo(firstRead);
+        assertThat(fileIO.inputStreamCount()).isEqualTo(1);
+        assertThat(LocalFileIO.create().listStatus(cachePath)).isNotEmpty();
+
+        filesCache.close();
     }
 
     // ============================ Compatibility tests ===================================
@@ -182,9 +206,12 @@ public class ManifestListTest {
     }
 
     private ManifestList createManifestList(String pathStr) {
+        return createManifestList(pathStr, FileIOFinder.find(new Path(pathStr)), null);
+    }
+
+    private ManifestList createManifestList(String pathStr, FileIO fileIO, FilesCache filesCache) {
         FileStorePathFactory pathFactory = createPathFactory(pathStr);
-        return new ManifestList.Factory(
-                        FileIOFinder.find(new Path(pathStr)), avro, "zstd", pathFactory, null)
+        return new ManifestList.Factory(fileIO, avro, "zstd", pathFactory, null, filesCache)
                 .create();
     }
 }

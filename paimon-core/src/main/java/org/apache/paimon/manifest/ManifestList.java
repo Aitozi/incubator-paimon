@@ -27,6 +27,7 @@ import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.ObjectSerializer;
 import org.apache.paimon.utils.ObjectsFile;
 import org.apache.paimon.utils.Pair;
@@ -56,6 +57,29 @@ public class ManifestList extends ObjectsFile<ManifestFileMeta> {
             String compression,
             PathFactory pathFactory,
             @Nullable SegmentsCache<Path> cache) {
+        this(
+                fileIO,
+                serializer,
+                schema,
+                readerFactory,
+                writerFactory,
+                compression,
+                pathFactory,
+                cache,
+                null);
+    }
+
+    @VisibleForTesting
+    public ManifestList(
+            FileIO fileIO,
+            ObjectSerializer<ManifestFileMeta> serializer,
+            RowType schema,
+            FormatReaderFactory readerFactory,
+            FormatWriterFactory writerFactory,
+            String compression,
+            PathFactory pathFactory,
+            @Nullable SegmentsCache<Path> cache,
+            @Nullable FilesCache filesCache) {
         super(
                 fileIO,
                 serializer,
@@ -64,7 +88,8 @@ public class ManifestList extends ObjectsFile<ManifestFileMeta> {
                 writerFactory,
                 compression,
                 pathFactory,
-                cache);
+                cache,
+                filesCache);
     }
 
     /**
@@ -129,6 +154,7 @@ public class ManifestList extends ObjectsFile<ManifestFileMeta> {
         private final String compression;
         private final FileStorePathFactory pathFactory;
         @Nullable private final SegmentsCache<Path> cache;
+        @Nullable private final FilesCache filesCache;
 
         public Factory(
                 FileIO fileIO,
@@ -136,11 +162,22 @@ public class ManifestList extends ObjectsFile<ManifestFileMeta> {
                 String compression,
                 FileStorePathFactory pathFactory,
                 @Nullable SegmentsCache<Path> cache) {
+            this(fileIO, fileFormat, compression, pathFactory, cache, null);
+        }
+
+        public Factory(
+                FileIO fileIO,
+                FileFormat fileFormat,
+                String compression,
+                FileStorePathFactory pathFactory,
+                @Nullable SegmentsCache<Path> cache,
+                @Nullable FilesCache filesCache) {
             this.fileIO = fileIO;
             this.fileFormat = fileFormat;
             this.compression = compression;
             this.pathFactory = pathFactory;
             this.cache = cache;
+            this.filesCache = filesCache;
         }
 
         public ManifestList create() {
@@ -153,7 +190,8 @@ public class ManifestList extends ObjectsFile<ManifestFileMeta> {
                     fileFormat.createWriterFactory(metaType),
                     compression,
                     pathFactory.manifestListFactory(),
-                    cache);
+                    cache,
+                    filesCache);
         }
     }
 }

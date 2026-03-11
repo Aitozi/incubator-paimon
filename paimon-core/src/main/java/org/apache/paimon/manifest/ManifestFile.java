@@ -36,6 +36,7 @@ import org.apache.paimon.stats.SimpleStatsConverter;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.FileStorePathFactory;
 import org.apache.paimon.utils.Filter;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.ObjectsFile;
 import org.apache.paimon.utils.PathFactory;
 import org.apache.paimon.utils.SegmentsCache;
@@ -70,7 +71,8 @@ public class ManifestFile extends ObjectsFile<ManifestEntry> {
             String compression,
             PathFactory pathFactory,
             long suggestedFileSize,
-            @Nullable SegmentsCache<Path> cache) {
+            @Nullable SegmentsCache<Path> cache,
+            @Nullable FilesCache filesCache) {
         super(
                 fileIO,
                 serializer,
@@ -79,7 +81,8 @@ public class ManifestFile extends ObjectsFile<ManifestEntry> {
                 writerFactory,
                 compression,
                 pathFactory,
-                cache);
+                cache,
+                filesCache);
         this.schemaManager = schemaManager;
         this.partitionType = partitionType;
         this.writerFactory = writerFactory;
@@ -263,6 +266,7 @@ public class ManifestFile extends ObjectsFile<ManifestEntry> {
         private final FileStorePathFactory pathFactory;
         private final long suggestedFileSize;
         @Nullable private final SegmentsCache<Path> cache;
+        @Nullable private final FilesCache filesCache;
 
         public Factory(
                 FileIO fileIO,
@@ -273,6 +277,28 @@ public class ManifestFile extends ObjectsFile<ManifestEntry> {
                 FileStorePathFactory pathFactory,
                 long suggestedFileSize,
                 @Nullable SegmentsCache<Path> cache) {
+            this(
+                    fileIO,
+                    schemaManager,
+                    partitionType,
+                    fileFormat,
+                    compression,
+                    pathFactory,
+                    suggestedFileSize,
+                    cache,
+                    null);
+        }
+
+        public Factory(
+                FileIO fileIO,
+                SchemaManager schemaManager,
+                RowType partitionType,
+                FileFormat fileFormat,
+                String compression,
+                FileStorePathFactory pathFactory,
+                long suggestedFileSize,
+                @Nullable SegmentsCache<Path> cache,
+                @Nullable FilesCache filesCache) {
             this.fileIO = fileIO;
             this.schemaManager = schemaManager;
             this.partitionType = partitionType;
@@ -281,6 +307,7 @@ public class ManifestFile extends ObjectsFile<ManifestEntry> {
             this.pathFactory = pathFactory;
             this.suggestedFileSize = suggestedFileSize;
             this.cache = cache;
+            this.filesCache = filesCache;
         }
 
         public boolean isCacheEnabled() {
@@ -300,7 +327,8 @@ public class ManifestFile extends ObjectsFile<ManifestEntry> {
                     compression,
                     pathFactory.manifestFileFactory(),
                     suggestedFileSize,
-                    cache);
+                    cache,
+                    filesCache);
         }
     }
 }

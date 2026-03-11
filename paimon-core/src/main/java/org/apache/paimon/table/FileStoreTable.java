@@ -37,6 +37,7 @@ import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.BranchManager;
 import org.apache.paimon.utils.ChangelogManager;
 import org.apache.paimon.utils.DVMetaCache;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.SegmentsCache;
 import org.apache.paimon.utils.TagManager;
 
@@ -56,6 +57,8 @@ import java.util.Optional;
 public interface FileStoreTable extends DataTable {
 
     void setManifestCache(SegmentsCache<Path> manifestCache);
+
+    void setManifestFileCache(FilesCache filesCache);
 
     @Nullable
     SegmentsCache<Path> getManifestCache();

@@ -26,6 +26,7 @@ import org.apache.paimon.fs.Path;
 import org.apache.paimon.table.BucketMode;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.ObjectsFile;
 import org.apache.paimon.utils.PathFactory;
 import org.apache.paimon.utils.SegmentsCache;
@@ -46,7 +47,8 @@ public class IndexManifestFile extends ObjectsFile<IndexManifestEntry> {
             FormatWriterFactory writerFactory,
             String compression,
             PathFactory pathFactory,
-            @Nullable SegmentsCache<Path> cache) {
+            @Nullable SegmentsCache<Path> cache,
+            @Nullable FilesCache filesCache) {
         super(
                 fileIO,
                 new IndexManifestEntrySerializer(),
@@ -55,7 +57,8 @@ public class IndexManifestFile extends ObjectsFile<IndexManifestEntry> {
                 writerFactory,
                 compression,
                 pathFactory,
-                cache);
+                cache,
+                filesCache);
     }
 
     public Path indexManifestFilePath(String fileName) {
@@ -83,6 +86,7 @@ public class IndexManifestFile extends ObjectsFile<IndexManifestEntry> {
         private final String compression;
         private final FileStorePathFactory pathFactory;
         @Nullable private final SegmentsCache<Path> cache;
+        @Nullable private final FilesCache filesCache;
 
         public Factory(
                 FileIO fileIO,
@@ -90,11 +94,22 @@ public class IndexManifestFile extends ObjectsFile<IndexManifestEntry> {
                 String compression,
                 FileStorePathFactory pathFactory,
                 @Nullable SegmentsCache<Path> cache) {
+            this(fileIO, fileFormat, compression, pathFactory, cache, null);
+        }
+
+        public Factory(
+                FileIO fileIO,
+                FileFormat fileFormat,
+                String compression,
+                FileStorePathFactory pathFactory,
+                @Nullable SegmentsCache<Path> cache,
+                @Nullable FilesCache filesCache) {
             this.fileIO = fileIO;
             this.fileFormat = fileFormat;
             this.compression = compression;
             this.pathFactory = pathFactory;
             this.cache = cache;
+            this.filesCache = filesCache;
         }
 
         public IndexManifestFile create() {
@@ -106,7 +121,8 @@ public class IndexManifestFile extends ObjectsFile<IndexManifestEntry> {
                     fileFormat.createWriterFactory(schema),
                     compression,
                     pathFactory.indexManifestFileFactory(),
-                    cache);
+                    cache,
+                    filesCache);
         }
     }
 }

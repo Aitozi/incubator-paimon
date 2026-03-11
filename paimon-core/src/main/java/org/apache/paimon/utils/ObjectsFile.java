@@ -51,6 +51,7 @@ public abstract class ObjectsFile<T> implements SimpleFileReader<T> {
     protected final PathFactory pathFactory;
 
     @Nullable protected final ObjectsCache<Path, T, ?> cache;
+    @Nullable protected final FilesCache filesCache;
 
     public ObjectsFile(
             FileIO fileIO,
@@ -61,6 +62,28 @@ public abstract class ObjectsFile<T> implements SimpleFileReader<T> {
             String compression,
             PathFactory pathFactory,
             @Nullable SegmentsCache<Path> cache) {
+        this(
+                fileIO,
+                serializer,
+                formatType,
+                readerFactory,
+                writerFactory,
+                compression,
+                pathFactory,
+                cache,
+                null);
+    }
+
+    public ObjectsFile(
+            FileIO fileIO,
+            ObjectSerializer<T> serializer,
+            RowType formatType,
+            FormatReaderFactory readerFactory,
+            FormatWriterFactory writerFactory,
+            String compression,
+            PathFactory pathFactory,
+            @Nullable SegmentsCache<Path> cache,
+            @Nullable FilesCache filesCache) {
         this.fileIO = fileIO;
         this.serializer = serializer;
         this.readerFactory = readerFactory;
@@ -68,6 +91,7 @@ public abstract class ObjectsFile<T> implements SimpleFileReader<T> {
         this.compression = compression;
         this.pathFactory = pathFactory;
         this.cache = cache == null ? null : createCache(cache, formatType);
+        this.filesCache = filesCache;
     }
 
     protected ObjectsCache<Path, T, ?> createCache(SegmentsCache<Path> cache, RowType formatType) {
@@ -186,6 +210,37 @@ public abstract class ObjectsFile<T> implements SimpleFileReader<T> {
 
     public CloseableIterator<InternalRow> createIterator(Path file, @Nullable Long fileSize)
             throws IOException {
+        if (filesCache != null) {
+            FilesCache.CachedFile cachedFile = filesCache.get(file, fileIO);
+            try {
+                CloseableIterator<InternalRow> iterator =
+                        FileUtils.createFormatReader(
+                                        filesCache.getCacheFileIO(),
+                                        readerFactory,
+                                        cachedFile.path,
+                                        cachedFile.size)
+                                .toCloseableIterator();
+                return CloseableIterator.adapterForIterator(
+                        iterator,
+                        () -> {
+                            try {
+                                iterator.close();
+                            } finally {
+                                cachedFile.decRef();
+                            }
+                        });
+            } catch (IOException e) {
+                cachedFile.decRef();
+                throw e;
+            } catch (RuntimeException e) {
+                cachedFile.decRef();
+                throw e;
+            } catch (Error e) {
+                cachedFile.decRef();
+                throw e;
+            }
+        }
+
         return FileUtils.createFormatReader(fileIO, readerFactory, file, fileSize)
                 .toCloseableIterator();
     }

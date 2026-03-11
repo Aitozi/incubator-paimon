@@ -19,15 +19,22 @@
 package org.apache.paimon.table.sink;
 
 import org.apache.paimon.CoreOptions;
+import org.apache.paimon.fs.Path;
+import org.apache.paimon.fs.local.LocalFileIO;
+import org.apache.paimon.options.MemorySize;
 import org.apache.paimon.options.Options;
+import org.apache.paimon.table.FileStoreTable;
 import org.apache.paimon.table.InnerTable;
 import org.apache.paimon.table.Table;
 import org.apache.paimon.types.RowType;
+import org.apache.paimon.utils.FilesCache;
 
 import javax.annotation.Nullable;
 
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.apache.paimon.CoreOptions.createCommitUser;
 
@@ -35,6 +42,8 @@ import static org.apache.paimon.CoreOptions.createCommitUser;
 public class BatchWriteBuilderImpl implements BatchWriteBuilder {
 
     private static final long serialVersionUID = 1L;
+
+    private static volatile FilesCache filesCache;
 
     private final InnerTable table;
     private final String commitUser;
@@ -78,6 +87,7 @@ public class BatchWriteBuilderImpl implements BatchWriteBuilder {
 
     @Override
     public BatchTableWrite newWrite() {
+        initManifestFileCache();
         return table.newWrite(commitUser).withIgnorePreviousFiles(staticPartition != null);
     }
 
@@ -107,5 +117,33 @@ public class BatchWriteBuilderImpl implements BatchWriteBuilder {
     public BatchWriteBuilderImpl rowIdCheckConflict(@Nullable Long rowIdCheckFromSnapshot) {
         this.rowIdCheckFromSnapshot = rowIdCheckFromSnapshot;
         return this;
+    }
+
+    private Path getLocalManifestCachePath() {
+        String tempDir = System.getProperty("java.io.tmpdir");
+        return new Path(Paths.get(tempDir, "manifest-cache-" + UUID.randomUUID()).toUri());
+    }
+
+    private void initManifestFileCache() {
+        if (!(table instanceof FileStoreTable)) {
+            return;
+        }
+
+        FileStoreTable fileStoreTable = (FileStoreTable) table;
+        MemorySize diskSize = Options.fromMap(fileStoreTable.options()).get(CoreOptions.WRITE_MANIFEST_DISK_CACHE);
+        if (diskSize.getBytes() <= 0) {
+            return;
+        }
+
+        if (filesCache == null) {
+            synchronized (BatchWriteBuilderImpl.class) {
+                if (filesCache == null) {
+                    filesCache =
+                            new FilesCache(
+                                    diskSize, getLocalManifestCachePath(), LocalFileIO.create());
+                }
+            }
+        }
+        fileStoreTable.setManifestFileCache(filesCache);
     }
 }

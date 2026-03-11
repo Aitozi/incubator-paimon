@@ -69,6 +69,7 @@ import org.apache.paimon.tag.TagPreview;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.ChangelogManager;
 import org.apache.paimon.utils.FileStorePathFactory;
+import org.apache.paimon.utils.FilesCache;
 import org.apache.paimon.utils.IndexFilePathFactories;
 import org.apache.paimon.utils.InternalRowPartitionComputer;
 import org.apache.paimon.utils.SegmentsCache;
@@ -105,6 +106,7 @@ abstract class AbstractFileStore<T> implements FileStore<T> {
     protected final CatalogEnvironment catalogEnvironment;
 
     @Nullable private SegmentsCache<Path> readManifestCache;
+    @Nullable private FilesCache manifestFileCache;
     @Nullable private Cache<Path, Snapshot> snapshotCache;
 
     protected AbstractFileStore(
@@ -207,7 +209,8 @@ abstract class AbstractFileStore<T> implements FileStore<T> {
                 options.manifestCompression(),
                 pathFactory(),
                 options.manifestTargetSize().getBytes(),
-                readManifestCache);
+                readManifestCache,
+                manifestFileCache);
     }
 
     @Override
@@ -217,7 +220,8 @@ abstract class AbstractFileStore<T> implements FileStore<T> {
                 FileFormat.manifestFormat(options),
                 options.manifestCompression(),
                 pathFactory(),
-                readManifestCache);
+                readManifestCache,
+                manifestFileCache);
     }
 
     @Override
@@ -227,7 +231,8 @@ abstract class AbstractFileStore<T> implements FileStore<T> {
                 FileFormat.manifestFormat(options),
                 options.manifestCompression(),
                 pathFactory(),
-                readManifestCache);
+                readManifestCache,
+                manifestFileCache);
     }
 
     @Override
@@ -516,6 +521,11 @@ abstract class AbstractFileStore<T> implements FileStore<T> {
     @Override
     public void setManifestCache(SegmentsCache<Path> manifestCache) {
         this.readManifestCache = manifestCache;
+    }
+
+    @Override
+    public void setManifestFileCache(FilesCache filesCache) {
+        this.manifestFileCache = filesCache;
     }
 
     @Override

@@ -673,6 +673,14 @@ public class CoreOptions implements Serializable {
                     .withDescription(
                             "When in batch append inserting, if the writer number is greater than this option, we open the buffer cache and spill function to avoid out-of-memory. ");
 
+    @ExcludeFromDocumentation("internal use only")
+    public static final ConfigOption<MemorySize> WRITE_MANIFEST_DISK_CACHE =
+            key("write-manifest-disk-cache")
+                    .memoryType()
+                    .defaultValue(MemorySize.ofMebiBytes(0))
+                    .withDescription(
+                            "Cache size for reading manifest files from local disk during batch write initialization.");
+
     public static final ConfigOption<Integer> LOCAL_SORT_MAX_NUM_FILE_HANDLES =
             key("local-sort.max-num-file-handles")
                     .intType()
