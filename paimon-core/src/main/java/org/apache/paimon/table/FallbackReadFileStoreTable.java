@@ -573,12 +573,14 @@ public class FallbackReadFileStoreTable extends DelegatedFileStoreTable {
 
         private final InnerTableRead mainRead;
         private final InnerTableRead fallbackRead;
+        private final boolean fallbackReadFailFast;
 
         private Read() {
             FileStoreTable first = wrappedFirst ? wrapped : other;
             FileStoreTable second = wrappedFirst ? other : wrapped;
             this.mainRead = first.newRead();
             this.fallbackRead = second.newRead();
+            this.fallbackReadFailFast = coreOptions().scanFallbackBranchReadFailFast();
         }
 
         @Override
@@ -623,10 +625,25 @@ public class FallbackReadFileStoreTable extends DelegatedFileStoreTable {
                 if (fallbackSplit.isFallback()) {
                     try {
                         return fallbackRead.createReader(fallbackSplit.wrapped());
-                    } catch (Exception ignored) {
+                    } catch (IOException | RuntimeException e) {
+                        if (fallbackReadFailFast) {
+                            throw e;
+                        }
                         LOG.error(
                                 "Reading from supplemental branch has problems: {}",
-                                fallbackSplit.wrapped());
+                                fallbackSplit.wrapped(),
+                                e);
+                    } catch (Exception e) {
+                        if (fallbackReadFailFast) {
+                            throw new IOException(
+                                    "Reading from supplemental branch has problems: "
+                                            + fallbackSplit.wrapped(),
+                                    e);
+                        }
+                        LOG.error(
+                                "Reading from supplemental branch has problems: {}",
+                                fallbackSplit.wrapped(),
+                                e);
                     }
                 }
             }

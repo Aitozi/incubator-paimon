@@ -24,6 +24,7 @@ import org.apache.paimon.fs.FileIO;
 import org.apache.paimon.fs.FileIOFinder;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.local.LocalFileIO;
+import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.manifest.PartitionEntry;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.predicate.PredicateBuilder;
@@ -33,6 +34,7 @@ import org.apache.paimon.schema.SchemaUtils;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.table.sink.StreamTableCommit;
 import org.apache.paimon.table.sink.StreamTableWrite;
+import org.apache.paimon.table.source.ChainSplit;
 import org.apache.paimon.table.source.DataTableScan;
 import org.apache.paimon.table.source.Split;
 import org.apache.paimon.types.DataType;
@@ -42,17 +44,21 @@ import org.apache.paimon.utils.Pair;
 import org.apache.paimon.utils.TraceableFileIO;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.apache.paimon.table.SchemaEvolutionTableTestBase.rowData;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Tests for {@link FallbackReadFileStoreTable}. */
 public class FallbackReadFileStoreTableTest {
@@ -62,6 +68,12 @@ public class FallbackReadFileStoreTableTest {
                         DataTypes.INT(), DataTypes.INT(),
                     },
                     new String[] {"pt", "a"});
+    private static final RowType CHAIN_ROW_TYPE =
+            RowType.of(
+                    new DataType[] {
+                        DataTypes.STRING(), DataTypes.INT(), DataTypes.BIGINT(),
+                    },
+                    new String[] {"dt", "a", "seq"});
 
     @TempDir java.nio.file.Path tempDir;
 
@@ -242,6 +254,51 @@ public class FallbackReadFileStoreTableTest {
         assertThat(mergedPartitions).containsExactlyInAnyOrder(1, 2, 3);
     }
 
+    @Test
+    public void testFallbackReadFailureCanFailFastForChainTable() throws Exception {
+        Options options = new Options();
+        options.set(CoreOptions.BUCKET, 1);
+        options.set(CoreOptions.CHAIN_TABLE_ENABLED, true);
+        options.set(CoreOptions.SEQUENCE_FIELD, "seq");
+        options.set(CoreOptions.PARTITION_TIMESTAMP_PATTERN, "$dt");
+        options.set(CoreOptions.PARTITION_TIMESTAMP_FORMATTER, "yyyy-MM-dd");
+        options.set(CoreOptions.SCAN_FALLBACK_BRANCH_READ_FAIL_FAST, true);
+        options.set(CoreOptions.SCAN_FALLBACK_SNAPSHOT_BRANCH, "snapshot");
+        options.set(CoreOptions.SCAN_FALLBACK_DELTA_BRANCH, "delta");
+
+        PrimaryKeyFileStoreTable mainTable = createPrimaryKeyTable(options.toMap());
+        mainTable.createBranch("snapshot");
+        mainTable.createBranch("delta");
+        FileStoreTable snapshotTable = createPrimaryKeyTableFromBranch(mainTable, "snapshot");
+        FileStoreTable deltaTable = createPrimaryKeyTableFromBranch(mainTable, "delta");
+        writeDataIntoTable(snapshotTable, 0, rowData("2024-01-01", 20, 1L));
+
+        FallbackReadFileStoreTable table =
+                new FallbackReadFileStoreTable(
+                        mainTable, new ChainGroupReadTable(snapshotTable, deltaTable), true);
+        Split fallbackSplit =
+                table.newScan()
+                        .withPartitionFilter(Collections.singletonMap("dt", "2024-01-01"))
+                        .plan()
+                        .splits()
+                        .get(0);
+        ChainSplit chainSplit =
+                (ChainSplit) ((FallbackReadFileStoreTable.FallbackSplit) fallbackSplit).wrapped();
+        DataFileMeta dataFile = chainSplit.dataFiles().get(0);
+        fileIO.delete(
+                new Path(
+                        chainSplit.fileBucketPathMapping().get(dataFile.fileName()),
+                        dataFile.fileName()),
+                false);
+
+        assertThatThrownBy(
+                        () ->
+                                table.newRead()
+                                        .createReader(fallbackSplit)
+                                        .forEachRemaining(row -> {}))
+                .hasMessageContaining(dataFile.fileName());
+    }
+
     private void writeDataIntoTable(
             FileStoreTable table, long commitIdentifier, InternalRow... allData) throws Exception {
         StreamTableWrite write = table.newWrite(commitUser);
@@ -257,6 +314,10 @@ public class FallbackReadFileStoreTableTest {
     }
 
     private AppendOnlyFileStoreTable createTable() throws Exception {
+        return createTable(Collections.emptyMap());
+    }
+
+    private AppendOnlyFileStoreTable createTable(Map<String, String> options) throws Exception {
         TableSchema tableSchema =
                 SchemaUtils.forceCommit(
                         new SchemaManager(LocalFileIO.create(), tablePath),
@@ -264,15 +325,40 @@ public class FallbackReadFileStoreTableTest {
                                 ROW_TYPE.getFields(),
                                 Collections.singletonList("pt"),
                                 Collections.emptyList(),
-                                Collections.emptyMap(),
+                                options,
                                 ""));
         return new AppendOnlyFileStoreTable(fileIO, tablePath, tableSchema);
+    }
+
+    private PrimaryKeyFileStoreTable createPrimaryKeyTable(Map<String, String> options)
+            throws Exception {
+        TableSchema tableSchema =
+                SchemaUtils.forceCommit(
+                        new SchemaManager(LocalFileIO.create(), tablePath),
+                        new Schema(
+                                CHAIN_ROW_TYPE.getFields(),
+                                Collections.singletonList("dt"),
+                                Arrays.asList("dt", "a"),
+                                options,
+                                ""));
+        return new PrimaryKeyFileStoreTable(fileIO, tablePath, tableSchema);
     }
 
     private FileStoreTable createTableFromBranch(FileStoreTable baseTable, String branchName) {
         Options options = new Options(baseTable.options());
         options.set(CoreOptions.BRANCH, branchName);
         return new AppendOnlyFileStoreTable(
+                        fileIO,
+                        tablePath,
+                        new SchemaManager(fileIO, tablePath, branchName).latest().get())
+                .copy(options.toMap());
+    }
+
+    private FileStoreTable createPrimaryKeyTableFromBranch(
+            FileStoreTable baseTable, String branchName) {
+        Options options = new Options(baseTable.options());
+        options.set(CoreOptions.BRANCH, branchName);
+        return new PrimaryKeyFileStoreTable(
                         fileIO,
                         tablePath,
                         new SchemaManager(fileIO, tablePath, branchName).latest().get())

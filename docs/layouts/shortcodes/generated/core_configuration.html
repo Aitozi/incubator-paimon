@@ -1188,6 +1188,12 @@ This config option does not affect the default filesystem metastore.</td>
             <td>When a batch job queries from a table, if a partition does not exist in the current branch, the reader will try to get this partition from this fallback branch.</td>
         </tr>
         <tr>
+            <td><h5>scan.fallback-branch.read-fail-fast</h5></td>
+            <td style="word-wrap: break-word;">false</td>
+            <td>Boolean</td>
+            <td>Whether to fail fast when reading from the fallback branch fails. By default, the reader keeps the old behavior and tries to read from the current branch.</td>
+        </tr>
+        <tr>
             <td><h5>scan.fallback-delta-branch</h5></td>
             <td style="word-wrap: break-word;">(none)</td>
             <td>String</td>

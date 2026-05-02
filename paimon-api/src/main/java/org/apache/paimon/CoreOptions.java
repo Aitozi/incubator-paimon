@@ -1972,6 +1972,14 @@ public class CoreOptions implements Serializable {
                             "When a batch job queries from a table, if a partition does not exist in the current branch, "
                                     + "the reader will try to get this partition from this fallback branch.");
 
+    public static final ConfigOption<Boolean> SCAN_FALLBACK_BRANCH_READ_FAIL_FAST =
+            key("scan.fallback-branch.read-fail-fast")
+                    .booleanType()
+                    .defaultValue(false)
+                    .withDescription(
+                            "Whether to fail fast when reading from the fallback branch fails. "
+                                    + "By default, the reader keeps the old behavior and tries to read from the current branch.");
+
     public static final ConfigOption<String> SCAN_PRIMARY_BRANCH =
             key("scan.primary-branch")
                     .stringType()
@@ -3721,6 +3729,10 @@ public class CoreOptions implements Serializable {
 
     public String scanFallbackDeltaBranch() {
         return options.get(SCAN_FALLBACK_DELTA_BRANCH);
+    }
+
+    public boolean scanFallbackBranchReadFailFast() {
+        return options.get(SCAN_FALLBACK_BRANCH_READ_FAIL_FAST);
     }
 
     public List<String> chainTableChainPartitionKeys() {
