@@ -2149,6 +2149,16 @@ public class CoreOptions implements Serializable {
                                     + "in 'clustering.by-columns'. 'order' is used for 1 column, 'zorder' for less than 5 columns, "
                                     + "and 'hilbert' for 5 or more columns.");
 
+    public static final ConfigOption<ClusteringMode> CLUSTERING_MODE =
+            key("clustering.mode")
+                    .enumType(ClusteringMode.class)
+                    .defaultValue(ClusteringMode.GLOBAL_SORT)
+                    .withFallbackKeys("sink.clustering.mode")
+                    .withDescription(
+                            "The mode for write-time clustering. "
+                                    + "'global-sort' (default) performs range shuffle before writing and optionally sorts within each range. "
+                                    + "'local-sort' skips range shuffle and sorts rows only within each writer task.");
+
     public static final ConfigOption<Boolean> CLUSTERING_INCREMENTAL =
             key("clustering.incremental")
                     .booleanType()
@@ -3726,6 +3736,10 @@ public class CoreOptions implements Serializable {
         return clusteringStrategy(options.get(CLUSTERING_STRATEGY), columnSize);
     }
 
+    public ClusteringMode clusteringMode() {
+        return options.get(CLUSTERING_MODE);
+    }
+
     public static List<String> clusteringColumns(String clusteringColumns) {
         if (clusteringColumns == null || clusteringColumns.isEmpty()) {
             return Collections.emptyList();
@@ -4472,6 +4486,34 @@ public class CoreOptions implements Serializable {
             }
 
             throw new IllegalArgumentException("cannot match type: " + orderType + " for ordering");
+        }
+    }
+
+    /** The mode for write-time clustering. */
+    public enum ClusteringMode implements DescribedEnum {
+        GLOBAL_SORT(
+                "global-sort",
+                "Perform range shuffle before writing and optionally sort within each range."),
+        LOCAL_SORT(
+                "local-sort",
+                "Sort rows only within each writer task without range shuffle. Every output file is internally ordered.");
+
+        private final String value;
+        private final String description;
+
+        ClusteringMode(String value, String description) {
+            this.value = value;
+            this.description = description;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+
+        @Override
+        public InlineElement getDescription() {
+            return text(description);
         }
     }
 

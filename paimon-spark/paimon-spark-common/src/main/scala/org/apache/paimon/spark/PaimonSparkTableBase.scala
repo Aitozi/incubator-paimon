@@ -19,6 +19,7 @@
 package org.apache.paimon.spark
 
 import org.apache.paimon.CoreOptions
+import org.apache.paimon.CoreOptions.{ClusteringMode, OrderType}
 import org.apache.paimon.CoreOptions.BucketFunctionType
 import org.apache.paimon.options.Options
 import org.apache.paimon.spark.catalog.functions.BucketFunction
@@ -65,7 +66,25 @@ abstract class PaimonSparkTableBase(val table: Table)
 
         case _ => false
       }
-    } && coreOptions.clusteringColumns().isEmpty
+    } && supportsV2Clustering
+  }
+
+  private def supportsV2Clustering: Boolean = {
+    val clusteringColumns = coreOptions.clusteringColumns()
+    clusteringColumns.isEmpty || {
+      table match {
+        case storeTable: FileStoreTable =>
+          val localSortSupportedBucket =
+            storeTable.bucketMode() == BUCKET_UNAWARE || storeTable.bucketMode() == HASH_FIXED
+          storeTable.primaryKeys().isEmpty &&
+          localSortSupportedBucket &&
+          coreOptions.clusteringMode() == ClusteringMode.LOCAL_SORT &&
+          coreOptions.clusteringStrategy(clusteringColumns.size()) == OrderType.ORDER &&
+          (!coreOptions.clusteringIncrementalEnabled() ||
+            coreOptions.clusteringIncrementalOptimizeWrite())
+        case _ => false
+      }
+    }
   }
 
   def getTable: Table = table

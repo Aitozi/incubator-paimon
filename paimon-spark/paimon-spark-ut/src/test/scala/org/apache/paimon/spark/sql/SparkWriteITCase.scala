@@ -21,8 +21,11 @@ package org.apache.paimon.spark.sql
 import org.apache.paimon.CoreOptions
 import org.apache.paimon.CoreOptions.BucketFunctionType
 import org.apache.paimon.catalog.Identifier
+import org.apache.paimon.manifest.ManifestEntry
 import org.apache.paimon.schema.Schema
 import org.apache.paimon.spark.PaimonSparkTestBase
+import org.apache.paimon.table.FileStoreTable
+import org.apache.paimon.table.source.DataSplit
 import org.apache.paimon.types.DataTypes
 
 import org.apache.spark.SparkConf
@@ -32,6 +35,9 @@ import org.junit.jupiter.api.Assertions
 
 import java.sql.Timestamp
 import java.time.LocalDateTime
+import java.util.Collections
+
+import scala.collection.JavaConverters._
 
 class SparkWriteWithNoExtensionITCase extends SparkWriteITCase {
 
@@ -331,6 +337,45 @@ class SparkWriteITCase extends PaimonSparkTestBase {
     }
   }
 
+  test("Paimon Write: local sort clustering for bucket unaware table") {
+    withTable("T") {
+      spark.sql("""
+                  |CREATE TABLE T (a INT, b INT, c INT)
+                  |TBLPROPERTIES (
+                  |  'bucket' = '-1',
+                  |  'clustering.columns' = 'a',
+                  |  'clustering.mode' = 'local-sort'
+                  |)
+                  |""".stripMargin)
+
+      val values = (99 to 0 by -1).map(i => s"($i, ${i % 10}, $i)").mkString(",")
+      spark.sql(s"INSERT INTO T VALUES $values")
+
+      Assertions.assertEquals(100, spark.sql("SELECT * FROM T").count())
+      assertDataFilesSortedByColumn(loadTable("T"), 0)
+    }
+  }
+
+  test("Paimon Write: local sort clustering for fixed bucket table") {
+    withTable("T") {
+      spark.sql("""
+                  |CREATE TABLE T (a INT, b INT, c INT)
+                  |TBLPROPERTIES (
+                  |  'bucket' = '3',
+                  |  'bucket-key' = 'b',
+                  |  'clustering.columns' = 'a',
+                  |  'clustering.mode' = 'local-sort'
+                  |)
+                  |""".stripMargin)
+
+      val values = (99 to 0 by -1).map(i => s"($i, ${i % 10}, $i)").mkString(",")
+      spark.sql(s"INSERT INTO T VALUES $values")
+
+      Assertions.assertEquals(100, spark.sql("SELECT * FROM T").count())
+      assertDataFilesSortedByColumn(loadTable("T"), 0)
+    }
+  }
+
   BucketFunctionType
     .values()
     .foreach(
@@ -359,4 +404,30 @@ class SparkWriteITCase extends PaimonSparkTestBase {
           }
         }
       })
+
+  private def assertDataFilesSortedByColumn(table: FileStoreTable, columnIndex: Int): Unit = {
+    val files = table.store().newScan().plan().files()
+    assertThat(files).isNotEmpty
+    files.asScala.foreach {
+      file: ManifestEntry =>
+        val dataSplit = DataSplit
+          .builder()
+          .withPartition(file.partition())
+          .withBucket(file.bucket())
+          .withDataFiles(Collections.singletonList(file.file()))
+          .withBucketPath("/temp/xxx")
+          .build()
+        var current = Int.MinValue
+        table
+          .newReadBuilder()
+          .newRead()
+          .createReader(dataSplit)
+          .forEachRemaining(
+            row => {
+              val result = row.getInt(columnIndex)
+              assertThat(result).isGreaterThanOrEqualTo(current)
+              current = result
+            })
+    }
+  }
 }

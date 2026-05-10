@@ -275,6 +275,44 @@ public class RangePartitionAndSortForAppendTableITCase extends CatalogITCaseBase
         Assertions.assertThat(files.size()).isGreaterThan(filesFilter.size());
     }
 
+    @Test
+    public void testLocalSortClusteringForBucketUnawareTable() throws Exception {
+        String id = TestValuesTableFactory.registerData(generateReversedRows());
+        batchSql(
+                "CREATE TEMPORARY TABLE test_source (col1 INT, col2 INT, col3 INT, col4 INT) WITH "
+                        + "('connector'='values', 'bounded'='true', 'data-id'='%s')",
+                id);
+        batchSql(
+                "INSERT INTO test_table /*+ OPTIONS('sink.clustering.by-columns' = 'col1', "
+                        + "'sink.clustering.mode' = 'local-sort', 'sink.parallelism' = '1') */ "
+                        + "SELECT * FROM test_source");
+
+        List<Row> sinkRows = batchSql("SELECT * FROM test_table");
+        assertThat(sinkRows.size()).isEqualTo(SINK_ROW_NUMBER);
+        assertDataFilesSortedByColumn(paimonTable("test_table"), 0);
+    }
+
+    @Test
+    public void testLocalSortClusteringForFixedBucketTable() throws Exception {
+        batchSql(
+                "CREATE TABLE IF NOT EXISTS bucket_table "
+                        + "(col1 INT, col2 INT, col3 INT, col4 INT) "
+                        + "WITH ('bucket' = '3', 'bucket-key' = 'col2')");
+        String id = TestValuesTableFactory.registerData(generateReversedRows());
+        batchSql(
+                "CREATE TEMPORARY TABLE test_source (col1 INT, col2 INT, col3 INT, col4 INT) WITH "
+                        + "('connector'='values', 'bounded'='true', 'data-id'='%s')",
+                id);
+        batchSql(
+                "INSERT INTO bucket_table /*+ OPTIONS('sink.clustering.by-columns' = 'col1', "
+                        + "'sink.clustering.mode' = 'local-sort', 'sink.parallelism' = '3') */ "
+                        + "SELECT * FROM test_source");
+
+        List<Row> sinkRows = batchSql("SELECT * FROM bucket_table");
+        assertThat(sinkRows.size()).isEqualTo(SINK_ROW_NUMBER);
+        assertDataFilesSortedByColumn(paimonTable("bucket_table"), 0);
+    }
+
     private List<Row> generateSinkRows() {
         List<Row> sinkRows = new ArrayList<>();
         Random random = new Random();
@@ -288,6 +326,39 @@ public class RangePartitionAndSortForAppendTableITCase extends CatalogITCaseBase
                             random.nextInt(SINK_ROW_NUMBER)));
         }
         return sinkRows;
+    }
+
+    private List<Row> generateReversedRows() {
+        List<Row> sinkRows = new ArrayList<>();
+        for (int i = SINK_ROW_NUMBER - 1; i >= 0; i--) {
+            sinkRows.add(Row.ofKind(RowKind.INSERT, i, i % 10, i, i));
+        }
+        return sinkRows;
+    }
+
+    private void assertDataFilesSortedByColumn(FileStoreTable table, int columnIndex)
+            throws Exception {
+        List<ManifestEntry> files = table.store().newScan().plan().files();
+        assertThat(files).isNotEmpty();
+        for (ManifestEntry file : files) {
+            DataSplit dataSplit =
+                    DataSplit.builder()
+                            .withPartition(file.partition())
+                            .withBucket(file.bucket())
+                            .withDataFiles(Collections.singletonList(file.file()))
+                            .withBucketPath("/temp/xxx")
+                            .build();
+            final AtomicInteger current = new AtomicInteger(Integer.MIN_VALUE);
+            table.newReadBuilder()
+                    .newRead()
+                    .createReader(dataSplit)
+                    .forEachRemaining(
+                            internalRow -> {
+                                int result = internalRow.getInt(columnIndex);
+                                Assertions.assertThat(result).isGreaterThanOrEqualTo(current.get());
+                                current.set(result);
+                            });
+        }
     }
 
     @Override

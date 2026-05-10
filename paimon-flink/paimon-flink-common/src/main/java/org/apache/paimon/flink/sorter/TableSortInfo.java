@@ -18,6 +18,7 @@
 
 package org.apache.paimon.flink.sorter;
 
+import org.apache.paimon.CoreOptions.ClusteringMode;
 import org.apache.paimon.CoreOptions.OrderType;
 import org.apache.paimon.flink.FlinkConnectorOptions;
 
@@ -38,6 +39,8 @@ public class TableSortInfo {
 
     private final OrderType sortStrategy;
 
+    private final ClusteringMode sortMode;
+
     private final boolean sortInCluster;
 
     private final int rangeNumber;
@@ -51,6 +54,7 @@ public class TableSortInfo {
     private TableSortInfo(
             List<String> sortColumns,
             OrderType sortStrategy,
+            ClusteringMode sortMode,
             boolean sortInCluster,
             int rangeNumber,
             int sinkParallelism,
@@ -58,6 +62,7 @@ public class TableSortInfo {
             int globalSampleSize) {
         this.sortColumns = sortColumns;
         this.sortStrategy = sortStrategy;
+        this.sortMode = sortMode;
         this.sortInCluster = sortInCluster;
         this.rangeNumber = rangeNumber;
         this.sinkParallelism = sinkParallelism;
@@ -71,6 +76,10 @@ public class TableSortInfo {
 
     public OrderType getSortStrategy() {
         return sortStrategy;
+    }
+
+    public ClusteringMode getSortMode() {
+        return sortMode;
     }
 
     public boolean isSortInCluster() {
@@ -100,6 +109,8 @@ public class TableSortInfo {
 
         private OrderType sortStrategy = OrderType.ORDER;
 
+        private ClusteringMode sortMode = ClusteringMode.GLOBAL_SORT;
+
         private boolean sortInCluster = true;
 
         private int rangeNumber = -1;
@@ -117,6 +128,11 @@ public class TableSortInfo {
 
         public Builder setSortStrategy(OrderType sortStrategy) {
             this.sortStrategy = sortStrategy;
+            return this;
+        }
+
+        public Builder setSortMode(ClusteringMode sortMode) {
+            this.sortMode = sortMode;
             return this;
         }
 
@@ -148,16 +164,20 @@ public class TableSortInfo {
         public TableSortInfo build() {
             checkArgument(!sortColumns.isEmpty(), "Sort columns cannot be empty");
             checkNotNull(sortStrategy, "Sort strategy cannot be null");
+            checkNotNull(sortMode, "Sort mode cannot be null");
             checkArgument(
                     sinkParallelism > 0,
                     "The sink parallelism must be specified when sorting the table data. Please set it using the key: %s",
                     FlinkConnectorOptions.SINK_PARALLELISM.key());
-            checkArgument(rangeNumber > 0, "Range number must be positive");
-            checkArgument(localSampleSize > 0, "Local sample size must be positive");
-            checkArgument(globalSampleSize > 0, "Global sample size must be positive");
+            if (sortMode == ClusteringMode.GLOBAL_SORT) {
+                checkArgument(rangeNumber > 0, "Range number must be positive");
+                checkArgument(localSampleSize > 0, "Local sample size must be positive");
+                checkArgument(globalSampleSize > 0, "Global sample size must be positive");
+            }
             return new TableSortInfo(
                     sortColumns,
                     sortStrategy,
+                    sortMode,
                     sortInCluster,
                     rangeNumber,
                     sinkParallelism,

@@ -19,7 +19,7 @@
 package org.apache.paimon.spark.commands
 
 import org.apache.paimon.{CoreOptions, Snapshot}
-import org.apache.paimon.CoreOptions.{PartitionSinkStrategy, WRITE_ONLY}
+import org.apache.paimon.CoreOptions.{ClusteringMode, PartitionSinkStrategy, WRITE_ONLY}
 import org.apache.paimon.codegen.CodeGenUtils
 import org.apache.paimon.crosspartition.{IndexBootstrap, KeyPartOrRow}
 import org.apache.paimon.data.BinaryRow
@@ -183,7 +183,7 @@ case class PaimonSparkWriter(
         dataFrame
           .mapPartitions(processor.processPartition)(encoderGroupWithBucketCol.encoder)
           .toDF())
-      writeWithBucket(repartitioned)
+      writeWithBucket(localSortIfNeeded(repartitioned))
     }
 
     def writeWithBucketAssigner(dataFrame: DataFrame, funcFactory: () => Row => Int) = {
@@ -199,6 +199,28 @@ case class PaimonSparkWriter(
               write.close()
             }
           }
+      }
+    }
+
+    def clusteringEnabled = {
+      val clusteringColumns = coreOptions.clusteringColumns()
+      table.primaryKeys().isEmpty &&
+      !clusteringColumns.isEmpty &&
+      (!coreOptions.clusteringIncrementalEnabled() ||
+        coreOptions.clusteringIncrementalOptimizeWrite())
+    }
+
+    def localSortIfNeeded(dataFrame: DataFrame): DataFrame = {
+      if (
+        clusteringEnabled &&
+        coreOptions.clusteringMode() == ClusteringMode.LOCAL_SORT &&
+        (table.bucketMode() == BUCKET_UNAWARE || table.bucketMode() == HASH_FIXED)
+      ) {
+        val clusteringColumns = coreOptions.clusteringColumns()
+        val strategy = coreOptions.clusteringStrategy(clusteringColumns.size())
+        TableSorter.getSorter(table, strategy, clusteringColumns).sortWithinPartitions(dataFrame)
+      } else {
+        dataFrame
       }
     }
 
@@ -306,12 +328,15 @@ case class PaimonSparkWriter(
         val clusteringColumns = coreOptions.clusteringColumns()
         if (
           table.bucketMode() != POSTPONE_MODE &&
-          (!coreOptions.clusteringIncrementalEnabled() || coreOptions
-            .clusteringIncrementalOptimizeWrite()) && (!clusteringColumns.isEmpty)
+          clusteringEnabled
         ) {
           val strategy = coreOptions.clusteringStrategy(clusteringColumns.size())
           val sorter = TableSorter.getSorter(table, strategy, clusteringColumns)
-          input = sorter.sort(data)
+          input = if (coreOptions.clusteringMode() == ClusteringMode.LOCAL_SORT) {
+            sorter.sortWithinPartitions(input)
+          } else {
+            sorter.sort(input)
+          }
         }
         writeWithoutBucket(input)
 
@@ -331,7 +356,7 @@ case class PaimonSparkWriter(
           val repartitioned =
             repartitionByPartitionsAndBucket(
               data.withColumn(BUCKET_COL, call_udf(BucketExpression.FIXED_BUCKET, args: _*)))
-          writeWithBucket(repartitioned)
+          writeWithBucket(localSortIfNeeded(repartitioned))
         } else {
           // Topology: input -> bucket-assigner -> shuffle by partition & bucket
           writeWithBucketProcessor(

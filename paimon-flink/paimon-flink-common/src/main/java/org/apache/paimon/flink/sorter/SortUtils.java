@@ -19,6 +19,7 @@
 package org.apache.paimon.flink.sorter;
 
 import org.apache.paimon.CoreOptions;
+import org.apache.paimon.CoreOptions.ClusteringMode;
 import org.apache.paimon.data.InternalRow;
 import org.apache.paimon.data.JoinedRow;
 import org.apache.paimon.flink.FlinkRowData;
@@ -140,6 +141,25 @@ public class SortUtils {
                                 new TupleTypeInfo<>(keyTypeInformation, inputStream.getType()))
                         .setParallelism(inputStream.getParallelism());
 
+        if (tableSortInfo.getSortMode() == ClusteringMode.LOCAL_SORT) {
+            return sortKeyedStream(
+                    inputWithKey
+                            .map(
+                                    a ->
+                                            new JoinedRow(
+                                                    convertor.apply(a.f0),
+                                                    new FlinkRowWrapper(a.f1)),
+                                    internalRowType)
+                            .setParallelism(inputStream.getParallelism()),
+                    options,
+                    valueRowType,
+                    sortKeyType,
+                    longRowType,
+                    valueProjectionMap,
+                    tableSortInfo.getSinkParallelism(),
+                    inputStream.getType());
+        }
+
         // range shuffle by key
         DataStream<Tuple2<KEY, RowData>> rangeShuffleResult =
                 RangeShuffle.rangeShuffleByKey(
@@ -153,61 +173,85 @@ public class SortUtils {
                         valueRowType,
                         options.sortBySize());
         if (tableSortInfo.isSortInCluster()) {
-            return rangeShuffleResult
-                    .map(
-                            a -> new JoinedRow(convertor.apply(a.f0), new FlinkRowWrapper(a.f1)),
-                            internalRowType)
-                    .setParallelism(sinkParallelism)
-                    // sort the output locally by `SortOperator`
-                    .transform(
-                            "LOCAL SORT",
-                            internalRowType,
-                            new SortOperator(
-                                    sortKeyType,
-                                    longRowType,
-                                    options.writeBufferSize(),
-                                    options.pageSize(),
-                                    options.localSortMaxNumFileHandles(),
-                                    options.spillCompressOptions(),
-                                    sinkParallelism,
-                                    options.writeBufferSpillDiskSize()))
-                    .setParallelism(sinkParallelism)
-                    // remove the key column from every row
-                    .map(
-                            new RichMapFunction<InternalRow, InternalRow>() {
-
-                                private transient KeyProjectedRow keyProjectedRow;
-
-                                /**
-                                 * Do not annotate with <code>@override</code> here to maintain
-                                 * compatibility with Flink 1.18-.
-                                 */
-                                public void open(OpenContext openContext) {
-                                    open(new Configuration());
-                                }
-
-                                /**
-                                 * Do not annotate with <code>@override</code> here to maintain
-                                 * compatibility with Flink 2.0+.
-                                 */
-                                public void open(Configuration parameters) {
-                                    keyProjectedRow = new KeyProjectedRow(valueProjectionMap);
-                                }
-
-                                @Override
-                                public InternalRow map(InternalRow value) {
-                                    return keyProjectedRow.replaceRow(value);
-                                }
-                            },
-                            InternalTypeInfo.fromRowType(valueRowType))
-                    .setParallelism(sinkParallelism)
-                    .map(FlinkRowData::new, inputStream.getType())
-                    .setParallelism(sinkParallelism);
+            return sortKeyedStream(
+                    rangeShuffleResult
+                            .map(
+                                    a ->
+                                            new JoinedRow(
+                                                    convertor.apply(a.f0),
+                                                    new FlinkRowWrapper(a.f1)),
+                                    internalRowType)
+                            .setParallelism(sinkParallelism),
+                    options,
+                    valueRowType,
+                    sortKeyType,
+                    longRowType,
+                    valueProjectionMap,
+                    sinkParallelism,
+                    inputStream.getType());
         } else {
             return rangeShuffleResult
                     .transform("REMOVE KEY", inputStream.getType(), new RemoveKeyOperator<>())
                     .setParallelism(sinkParallelism);
         }
+    }
+
+    private static DataStream<RowData> sortKeyedStream(
+            DataStream<InternalRow> keyedInput,
+            CoreOptions options,
+            RowType valueRowType,
+            RowType sortKeyType,
+            RowType longRowType,
+            int[] valueProjectionMap,
+            int sinkParallelism,
+            TypeInformation<RowData> outputType) {
+        InternalTypeInfo<InternalRow> internalRowType = InternalTypeInfo.fromRowType(longRowType);
+        return keyedInput
+                // sort the output locally by `SortOperator`
+                .transform(
+                        "LOCAL SORT",
+                        internalRowType,
+                        new SortOperator(
+                                sortKeyType,
+                                longRowType,
+                                options.writeBufferSize(),
+                                options.pageSize(),
+                                options.localSortMaxNumFileHandles(),
+                                options.spillCompressOptions(),
+                                sinkParallelism,
+                                options.writeBufferSpillDiskSize()))
+                .setParallelism(sinkParallelism)
+                // remove the key column from every row
+                .map(
+                        new RichMapFunction<InternalRow, InternalRow>() {
+
+                            private transient KeyProjectedRow keyProjectedRow;
+
+                            /**
+                             * Do not annotate with <code>@override</code> here to maintain
+                             * compatibility with Flink 1.18-.
+                             */
+                            public void open(OpenContext openContext) {
+                                open(new Configuration());
+                            }
+
+                            /**
+                             * Do not annotate with <code>@override</code> here to maintain
+                             * compatibility with Flink 2.0+.
+                             */
+                            public void open(Configuration parameters) {
+                                keyProjectedRow = new KeyProjectedRow(valueProjectionMap);
+                            }
+
+                            @Override
+                            public InternalRow map(InternalRow value) {
+                                return keyProjectedRow.replaceRow(value);
+                            }
+                        },
+                        InternalTypeInfo.fromRowType(valueRowType))
+                .setParallelism(sinkParallelism)
+                .map(FlinkRowData::new, outputType)
+                .setParallelism(sinkParallelism);
     }
 
     /** Abstract key from a row data. */

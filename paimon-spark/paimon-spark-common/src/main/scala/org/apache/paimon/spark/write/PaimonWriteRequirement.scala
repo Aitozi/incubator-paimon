@@ -18,13 +18,14 @@
 
 package org.apache.paimon.spark.write
 
+import org.apache.paimon.CoreOptions.{ClusteringMode, OrderType}
 import org.apache.paimon.CoreOptions.PartitionSinkStrategy
 import org.apache.paimon.spark.commands.BucketExpression.quote
 import org.apache.paimon.table.BucketMode._
 import org.apache.paimon.table.FileStoreTable
 
 import org.apache.spark.sql.connector.distributions.{ClusteredDistribution, Distribution, Distributions}
-import org.apache.spark.sql.connector.expressions.{Expression, Expressions, SortOrder}
+import org.apache.spark.sql.connector.expressions.{Expression, Expressions, SortDirection, SortOrder}
 
 import scala.collection.JavaConverters._
 
@@ -34,8 +35,6 @@ case class PaimonWriteRequirement(distribution: Distribution, ordering: Array[So
 object PaimonWriteRequirement {
 
   private val EMPTY_ORDERING: Array[SortOrder] = Array.empty
-  private val EMPTY: PaimonWriteRequirement =
-    PaimonWriteRequirement(Distributions.unspecified(), EMPTY_ORDERING)
 
   def apply(table: FileStoreTable): PaimonWriteRequirement = {
     val bucketSpec = table.bucketSpec()
@@ -56,6 +55,7 @@ object PaimonWriteRequirement {
       table.schema().partitionKeys().asScala.map(key => Expressions.identity(quote(key)))
     val clusteringExpressions =
       (partitionTransforms ++ bucketTransforms).map(identity[Expression]).toArray
+    val ordering = clusteringOrdering(table)
 
     if (
       clusteringExpressions.isEmpty || (bucketTransforms.isEmpty && table
@@ -63,11 +63,34 @@ object PaimonWriteRequirement {
         .partitionSinkStrategy()
         .equals(PartitionSinkStrategy.NONE))
     ) {
-      EMPTY
+      PaimonWriteRequirement(Distributions.unspecified(), ordering)
     } else {
       val distribution: ClusteredDistribution =
         Distributions.clustered(clusteringExpressions)
-      PaimonWriteRequirement(distribution, EMPTY_ORDERING)
+      PaimonWriteRequirement(distribution, ordering)
+    }
+  }
+
+  private def clusteringOrdering(table: FileStoreTable): Array[SortOrder] = {
+    val coreOptions = table.coreOptions()
+    val clusteringColumns = coreOptions.clusteringColumns()
+    val localSortSupportedBucket =
+      table.bucketMode() == BUCKET_UNAWARE || table.bucketMode() == HASH_FIXED
+    if (
+      table.primaryKeys().isEmpty &&
+      localSortSupportedBucket &&
+      !clusteringColumns.isEmpty &&
+      coreOptions.clusteringMode() == ClusteringMode.LOCAL_SORT &&
+      coreOptions.clusteringStrategy(clusteringColumns.size()) == OrderType.ORDER &&
+      (!coreOptions.clusteringIncrementalEnabled() ||
+        coreOptions.clusteringIncrementalOptimizeWrite())
+    ) {
+      clusteringColumns.asScala
+        .map(
+          column => Expressions.sort(Expressions.identity(quote(column)), SortDirection.ASCENDING))
+        .toArray
+    } else {
+      EMPTY_ORDERING
     }
   }
 }
