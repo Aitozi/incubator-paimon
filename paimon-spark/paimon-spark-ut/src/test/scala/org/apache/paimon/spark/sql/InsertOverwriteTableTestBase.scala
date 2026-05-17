@@ -455,6 +455,30 @@ abstract class InsertOverwriteTableTestBase extends PaimonSparkTestBase {
     checkAnswer(spark.sql("SELECT * FROM T"), Row("1", Date.valueOf("2024-04-18")))
   }
 
+  test("insert overwrite complete static partition preserves historical bucket") {
+    spark.sql(s"""
+                 |CREATE TABLE T (
+                 |  id INT,
+                 |  data STRING,
+                 |  pt STRING)
+                 |PARTITIONED BY (pt)
+                 |TBLPROPERTIES (
+                 |  'bucket' = '2',
+                 |  'bucket-key' = 'id',
+                 |  'bucket-function.type' = 'mod'
+                 |);
+                 |""".stripMargin)
+
+    spark.sql("INSERT INTO T VALUES (1, 'old', 'p1')")
+    spark.sql("ALTER TABLE T SET TBLPROPERTIES ('bucket' = '4')")
+    spark.sql("INSERT OVERWRITE T PARTITION (pt = 'p1') VALUES (3, 'new')")
+
+    checkAnswer(spark.sql("SELECT * FROM T"), Row(3, "new", "p1") :: Nil)
+    checkAnswer(
+      spark.sql("SELECT bucket FROM `T$buckets` WHERE partition = '{p1}'"),
+      Row(1) :: Nil)
+  }
+
   test("Paimon Insert: all data types") {
     spark.sql("""
                 |CREATE TABLE T (

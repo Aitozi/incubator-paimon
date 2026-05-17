@@ -39,6 +39,7 @@ import org.apache.paimon.spark.util.SparkRowUtils
 import org.apache.paimon.spark.write.{PaimonDataWrite, WriteHelper, WriteTaskResult}
 import org.apache.paimon.table.{FileStoreTable, PostponeUtils, SpecialFields}
 import org.apache.paimon.table.BucketMode._
+import org.apache.paimon.table.StaticPartitionBucketUtils
 import org.apache.paimon.table.sink._
 import org.apache.paimon.types.{RowKind, RowType}
 import org.apache.paimon.utils.SerializationUtils
@@ -56,12 +57,22 @@ import scala.collection.JavaConverters._
 case class PaimonSparkWriter(
     table: FileStoreTable,
     writeRowTracking: Boolean = false,
-    batchId: Option[Long] = None)
+    batchId: Option[Long] = None,
+    overwritePartition: Option[Map[String, String]] = None)
   extends WriteHelper {
 
   private lazy val tableSchema = table.schema
 
   private lazy val bucketMode = table.bucketMode
+
+  private lazy val writeTable: FileStoreTable =
+    if (postponeBatchWriteFixedBucket) {
+      PostponeUtils.tableForFixBucketWrite(table)
+    } else {
+      StaticPartitionBucketUtils.tableWithHistoricalBucket(
+        table,
+        overwritePartition.map(_.asJava).orNull)
+    }
 
   private val fullCompactionDeltaCommits: Option[Int] =
     Option.apply(coreOptions.fullCompactionDeltaCommits())
@@ -85,21 +96,26 @@ case class PaimonSparkWriter(
     table.bucketMode() == POSTPONE_MODE && coreOptions.postponeBatchWriteFixedBucket()
 
   val writeBuilder: BatchWriteBuilder = {
-    val tableForWrite = if (postponeBatchWriteFixedBucket) {
-      PostponeUtils.tableForFixBucketWrite(table)
-    } else {
-      table
-    }
-    tableForWrite.newBatchWriteBuilder()
+    val builder = writeTable.newBatchWriteBuilder()
+    overwritePartition.foreach(partitions => builder.withOverwrite(partitions.asJava))
+    builder
   }
 
   def writeOnly(): PaimonSparkWriter = {
-    PaimonSparkWriter(table.copy(singletonMap(WRITE_ONLY.key(), "true")))
+    PaimonSparkWriter(
+      table.copy(singletonMap(WRITE_ONLY.key(), "true")),
+      writeRowTracking,
+      batchId,
+      overwritePartition)
   }
 
   def withRowTracking(): PaimonSparkWriter = {
     if (coreOptions.rowTrackingEnabled()) {
-      PaimonSparkWriter(table, writeRowTracking = true)
+      PaimonSparkWriter(
+        table,
+        writeRowTracking = true,
+        batchId = batchId,
+        overwritePartition = overwritePartition)
     } else {
       this
     }
@@ -316,17 +332,18 @@ case class PaimonSparkWriter(
         writeWithoutBucket(input)
 
       case HASH_FIXED =>
-        if (paimonExtensionEnabled && BucketFunction.supportsTable(table)) {
+        if (paimonExtensionEnabled && BucketFunction.supportsTable(writeTable)) {
           // Topology: input -> shuffle by partition & bucket
-          val bucketNumber = coreOptions.bucket()
-          val bucketKeyCol = tableSchema
+          val bucketNumber = writeTable.coreOptions().bucket()
+          val bucketKeyCol = writeTable
+            .schema()
             .bucketKeys()
             .asScala
-            .map(tableSchema.fieldNames().indexOf(_))
+            .map(writeTable.schema().fieldNames().indexOf(_))
             .map(x => col(data.schema.fieldNames(x)))
             .toSeq
           val args = Seq(
-            lit(new CoreOptions(tableSchema.options()).bucketFunctionType().toString),
+            lit(new CoreOptions(writeTable.schema().options()).bucketFunctionType().toString),
             lit(bucketNumber)) ++ bucketKeyCol
           val repartitioned =
             repartitionByPartitionsAndBucket(
@@ -336,7 +353,7 @@ case class PaimonSparkWriter(
           // Topology: input -> bucket-assigner -> shuffle by partition & bucket
           writeWithBucketProcessor(
             withInitBucketCol,
-            CommonBucketProcessor(table, bucketColIdx, encoderGroupWithBucketCol))
+            CommonBucketProcessor(writeTable, bucketColIdx, encoderGroupWithBucketCol))
         }
 
       case _ =>

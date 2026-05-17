@@ -29,8 +29,6 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.command.RunnableCommand
 
-import scala.collection.JavaConverters._
-
 /** Used to write a [[DataFrame]] into a paimon table. */
 case class WriteIntoPaimonTable(
     override val originTable: FileStoreTable,
@@ -51,10 +49,8 @@ case class WriteIntoPaimonTable(
     updateTableWithOptions(
       Map(DYNAMIC_PARTITION_OVERWRITE.key -> dynamicPartitionOverwriteMode.toString))
 
-    val writer = PaimonSparkWriter(table, batchId = batchId)
-    if (overwritePartition != null) {
-      writer.writeBuilder.withOverwrite(overwritePartition.asJava)
-    }
+    val writer =
+      PaimonSparkWriter(table, batchId = batchId, overwritePartition = Option(overwritePartition))
     val commitMessages = writer.write(data)
     writer.commit(commitMessages)
 

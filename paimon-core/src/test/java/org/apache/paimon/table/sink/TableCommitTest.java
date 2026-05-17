@@ -21,6 +21,7 @@ package org.apache.paimon.table.sink;
 import org.apache.paimon.CoreOptions;
 import org.apache.paimon.data.BinaryRow;
 import org.apache.paimon.data.BinaryRowWriter;
+import org.apache.paimon.data.BinaryString;
 import org.apache.paimon.data.GenericRow;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.local.LocalFileIO;
@@ -29,6 +30,7 @@ import org.apache.paimon.io.DataFileMeta;
 import org.apache.paimon.io.DataFilePathFactory;
 import org.apache.paimon.io.DataIncrement;
 import org.apache.paimon.manifest.ManifestCommittable;
+import org.apache.paimon.manifest.SimpleFileEntry;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.schema.SchemaManager;
@@ -382,6 +384,62 @@ public class TableCommitTest {
         }
         write1.close();
         commit1.close();
+    }
+
+    @Test
+    public void testStaticPartitionOverwriteUsesHistoricalBucket() throws Exception {
+        String path = tempDir.toString();
+        RowType rowType =
+                RowType.of(
+                        new DataType[] {DataTypes.INT(), DataTypes.BIGINT(), DataTypes.STRING()},
+                        new String[] {"k", "v", "pt"});
+
+        Options options = new Options();
+        options.set(CoreOptions.PATH, path);
+        options.set(CoreOptions.BUCKET, 2);
+        options.set(CoreOptions.BUCKET_KEY, "k");
+        TableSchema tableSchema =
+                SchemaUtils.forceCommit(
+                        new SchemaManager(LocalFileIO.create(), new Path(path)),
+                        new Schema(
+                                rowType.getFields(),
+                                Collections.singletonList("pt"),
+                                Collections.emptyList(),
+                                options.toMap(),
+                                ""));
+        FileStoreTable table =
+                FileStoreTableFactory.create(
+                        LocalFileIO.create(),
+                        new Path(path),
+                        tableSchema,
+                        CatalogEnvironment.empty());
+
+        BatchWriteBuilder writeBuilder = table.newBatchWriteBuilder();
+        try (BatchTableWrite write = writeBuilder.newWrite();
+                BatchTableCommit commit = writeBuilder.newCommit()) {
+            write.write(GenericRow.of(1, 10L, BinaryString.fromString("p1")));
+            commit.commit(write.prepareCommit());
+        }
+
+        FileStoreTable rescaledTable = table.copy(singletonMap(CoreOptions.BUCKET.key(), "4"));
+        BatchWriteBuilder overwriteBuilder =
+                rescaledTable
+                        .newBatchWriteBuilder()
+                        .withOverwrite(Collections.singletonMap("pt", "p1"));
+        try (BatchTableWrite write = overwriteBuilder.newWrite();
+                BatchTableCommit commit = overwriteBuilder.newCommit()) {
+            write.write(GenericRow.of(3, 30L, BinaryString.fromString("p1")));
+            commit.commit(write.prepareCommit());
+        }
+
+        List<SimpleFileEntry> entries = rescaledTable.store().newScan().readSimpleEntries();
+        assertThat(entries).isNotEmpty();
+        assertThat(entries)
+                .allSatisfy(
+                        entry -> {
+                            assertThat(entry.totalBuckets()).isEqualTo(2);
+                            assertThat(entry.bucket()).isLessThan(2);
+                        });
     }
 
     @Test

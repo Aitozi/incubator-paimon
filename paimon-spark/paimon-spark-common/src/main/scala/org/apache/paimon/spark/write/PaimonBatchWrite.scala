@@ -23,7 +23,7 @@ import org.apache.paimon.spark.catalyst.Compatibility
 import org.apache.paimon.spark.commands.SparkDataFileMeta
 import org.apache.paimon.spark.metric.SparkMetricRegistry
 import org.apache.paimon.spark.rowops.PaimonCopyOnWriteScan
-import org.apache.paimon.table.FileStoreTable
+import org.apache.paimon.table.{FileStoreTable, StaticPartitionBucketUtils}
 import org.apache.paimon.table.sink.{BatchWriteBuilder, CommitMessage, CommitMessageImpl}
 
 import org.apache.spark.sql.PaimonSparkSession
@@ -48,7 +48,10 @@ case class PaimonBatchWrite(
   protected val metricRegistry = SparkMetricRegistry()
 
   protected val batchWriteBuilder: BatchWriteBuilder = {
-    val builder = table.newBatchWriteBuilder()
+    val writeTable = StaticPartitionBucketUtils.tableWithHistoricalBucket(
+      table,
+      overwritePartitions.map(_.asJava).orNull)
+    val builder = writeTable.newBatchWriteBuilder()
     overwritePartitions.foreach(partitions => builder.withOverwrite(partitions.asJava))
     builder
   }
