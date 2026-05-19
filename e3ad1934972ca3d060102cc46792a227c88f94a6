@@ -1,0 +1,203 @@
+paimon-flink/paimon-flink-common/src/test/java/org/apache/paimon/flink/BranchSqlITCase.java
+  67c64dd6fa70ad62 731,734-738,742,744-746,756-757,763,766-767,773,785,789-947 gitai:{"mixed_line_ranges":[{"Single":804},{"Single":837},{"Single":871},{"Single":901},{"Single":922},{"Single":941}],"operations":[{"operation_id":"6a06fc9c84bcc9c8dc26d11e","tool_type":"agent","tool_id":"SearchReplace","line_ranges":[{"Single":731},{"Range":[734,738]},{"Single":742},{"Range":[744,746]},{"Range":[756,757]},{"Single":763},{"Range":[766,767]},{"Single":773},{"Single":785},{"Range":[789,947]}]}]}
+paimon-spark/paimon-spark-ut/src/test/scala/org/apache/paimon/spark/procedure/BranchProcedureTest.scala
+  67c64dd6fa70ad62 89,97,99-103 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a06fc9c84bcc9c8dc26d11e","tool_type":"agent","tool_id":"SearchReplace","line_ranges":[{"Single":89},{"Single":97},{"Range":[99,103]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "e3ad1934972ca3d060102cc46792a227c88f94a6",
+  "prompts": {
+    "67c64dd6fa70ad62": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0690cf84bcc9c8dc26b9ca",
+        "model": "glm-5.1__dev"
+      },
+      "human_author": "zhangkkailun.zkl <zhangkkailun.zkl@bytedance.com>",
+      "messages": [],
+      "total_additions": 185,
+      "total_deletions": 14,
+      "accepted_lines": 168,
+      "overriden_lines": 6
+    }
+  },
+  "attestation_metadata": {
+    "paimon-flink/paimon-flink-common/src/test/java/org/apache/paimon/flink/BranchSqlITCase.java": [
+      {
+        "hash": "67c64dd6fa70ad62",
+        "line_ranges": [
+          {
+            "Single": 731
+          },
+          {
+            "Range": [
+              734,
+              738
+            ]
+          },
+          {
+            "Single": 742
+          },
+          {
+            "Range": [
+              744,
+              746
+            ]
+          },
+          {
+            "Range": [
+              756,
+              757
+            ]
+          },
+          {
+            "Single": 763
+          },
+          {
+            "Range": [
+              766,
+              767
+            ]
+          },
+          {
+            "Single": 773
+          },
+          {
+            "Single": 785
+          },
+          {
+            "Range": [
+              789,
+              947
+            ]
+          }
+        ],
+        "mixed_line_ranges": [
+          {
+            "Single": 804
+          },
+          {
+            "Single": 837
+          },
+          {
+            "Single": 871
+          },
+          {
+            "Single": 901
+          },
+          {
+            "Single": 922
+          },
+          {
+            "Single": 941
+          }
+        ],
+        "operations": [
+          {
+            "operation_id": "6a06fc9c84bcc9c8dc26d11e",
+            "tool_type": "agent",
+            "tool_id": "SearchReplace",
+            "line_ranges": [
+              {
+                "Single": 731
+              },
+              {
+                "Range": [
+                  734,
+                  738
+                ]
+              },
+              {
+                "Single": 742
+              },
+              {
+                "Range": [
+                  744,
+                  746
+                ]
+              },
+              {
+                "Range": [
+                  756,
+                  757
+                ]
+              },
+              {
+                "Single": 763
+              },
+              {
+                "Range": [
+                  766,
+                  767
+                ]
+              },
+              {
+                "Single": 773
+              },
+              {
+                "Single": 785
+              },
+              {
+                "Range": [
+                  789,
+                  947
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "paimon-spark/paimon-spark-ut/src/test/scala/org/apache/paimon/spark/procedure/BranchProcedureTest.scala": [
+      {
+        "hash": "67c64dd6fa70ad62",
+        "line_ranges": [
+          {
+            "Single": 89
+          },
+          {
+            "Single": 97
+          },
+          {
+            "Range": [
+              99,
+              103
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a06fc9c84bcc9c8dc26d11e",
+            "tool_type": "agent",
+            "tool_id": "SearchReplace",
+            "line_ranges": [
+              {
+                "Single": 89
+              },
+              {
+                "Single": 97
+              },
+              {
+                "Range": [
+                  99,
+                  103
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "67c64dd6fa70ad62": {
+      "tool": "trae",
+      "conversation_id": "6a0690cf84bcc9c8dc26b9ca",
+      "session_id": "6a0690cf84bcc9c8dc26b9ca",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
