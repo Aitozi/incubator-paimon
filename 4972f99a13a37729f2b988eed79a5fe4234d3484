@@ -1,0 +1,29 @@
+paimon-core/src/test/java/org/apache/paimon/utils/CatalogBranchManagerTest.java
+  67c64dd6fa70ad62 51-158
+paimon-spark/paimon-spark-ut/src/test/scala/org/apache/paimon/spark/procedure/BranchProcedureTest.scala
+  67c64dd6fa70ad62 39-42,74-77,85,93,95-99
+paimon-flink/paimon-flink-common/src/test/java/org/apache/paimon/flink/BranchSqlITCase.java
+  67c64dd6fa70ad62 729,732-736,740,742-744,753-754,760,763-764,770,781,785-866,868,873-878,883-946
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "4972f99a13a37729f2b988eed79a5fe4234d3484",
+  "prompts": {
+    "67c64dd6fa70ad62": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0690cf84bcc9c8dc26b9ca",
+        "model": "glm-5.1__dev"
+      },
+      "human_author": "zhangkkailun.zkl <zhangkkailun.zkl@bytedance.com>",
+      "messages": [],
+      "total_additions": 83,
+      "total_deletions": 36,
+      "accepted_lines": 293,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
