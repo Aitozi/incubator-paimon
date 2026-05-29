@@ -1,0 +1,31 @@
+paimon-spark/paimon-spark-common/src/main/scala/org/apache/paimon/spark/commands/PaimonSparkWriter.scala
+  3a4598d1a3ff5330 93-96,147-171,182,184-200,556,576-580
+paimon-spark/paimon-spark-3.2-bd/src/main/scala/org/apache/paimon/spark/execution/PaimonFileSourceScanExec.scala
+  3a4598d1a3ff5330 28,184-197,199,214,292-294,297-300,553-557
+paimon-core/src/main/java/org/apache/paimon/utils/MetaColumns.java
+  3a4598d1a3ff5330 60
+paimon-common/src/main/java/org/apache/paimon/table/SpecialFields.java
+  3a4598d1a3ff5330 96-98,105-106,179-188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f6bbf60d5752953667bf4639daa620417805d70b",
+  "prompts": {
+    "3a4598d1a3ff5330": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a13fc630fc64e77bae02dbb",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "linchen.23 <linchen.23@bytedance.com>",
+      "messages": [],
+      "total_additions": 40,
+      "total_deletions": 120,
+      "accepted_lines": 98,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
