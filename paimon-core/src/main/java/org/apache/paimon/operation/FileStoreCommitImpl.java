@@ -101,6 +101,7 @@ import static org.apache.paimon.manifest.ManifestEntry.nullableRecordCount;
 import static org.apache.paimon.manifest.ManifestEntry.recordCountAdd;
 import static org.apache.paimon.manifest.ManifestEntry.recordCountDelete;
 import static org.apache.paimon.operation.commit.ManifestEntryChanges.changedPartitions;
+import static org.apache.paimon.operation.commit.RowTrackingCommitUtils.assignPrimaryKeyAlignment;
 import static org.apache.paimon.operation.commit.RowTrackingCommitUtils.assignRowTracking;
 import static org.apache.paimon.partition.PartitionPredicate.createBinaryPartitions;
 import static org.apache.paimon.partition.PartitionPredicate.createPartitionPredicate;
@@ -987,6 +988,11 @@ public class FileStoreCommitImpl implements FileStoreCommit {
                         assignRowTracking(newSnapshotId, firstRowIdStart, deltaFiles);
                 nextRowIdStart = assigned.nextRowIdStart;
                 deltaFiles = assigned.assignedEntries;
+            } else if (primaryKeyDataEvolutionEnabled()) {
+                RowTrackingAssigned assigned =
+                        assignPrimaryKeyAlignment(firstRowIdStart, deltaFiles);
+                nextRowIdStart = assigned.nextRowIdStart;
+                deltaFiles = assigned.assignedEntries;
             }
 
             // the added records subtract the deleted records from
@@ -1107,6 +1113,14 @@ public class FileStoreCommitImpl implements FileStoreCommit {
                         finalBaseFiles, finalDeltaFiles, indexFiles, newSnapshot, identifier);
         commitCallbacks.forEach(callback -> callback.call(context));
         return new SuccessCommitResult();
+    }
+
+    private boolean primaryKeyDataEvolutionEnabled() {
+        return options.dataEvolutionEnabled()
+                && !schemaManager
+                        .latestOrThrow("Cannot get latest schema for table " + tableName)
+                        .primaryKeys()
+                        .isEmpty();
     }
 
     public boolean replaceManifestList(

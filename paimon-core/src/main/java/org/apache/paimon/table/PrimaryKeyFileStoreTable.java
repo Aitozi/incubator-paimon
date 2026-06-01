@@ -33,17 +33,24 @@ import org.apache.paimon.schema.KeyValueFieldsExtractor;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.table.query.LocalTableQuery;
 import org.apache.paimon.table.sink.TableWriteImpl;
+import org.apache.paimon.table.source.DataEvolutionSplitGenerator;
 import org.apache.paimon.table.source.InnerTableRead;
 import org.apache.paimon.table.source.KeyValueTableRead;
 import org.apache.paimon.table.source.MergeTreeSplitGenerator;
 import org.apache.paimon.table.source.SplitGenerator;
+import org.apache.paimon.table.source.splitread.DataEvolutionMergeFileSplitReadProvider;
+import org.apache.paimon.table.source.splitread.PrimaryKeyTableRawFileSplitReadProvider;
+import org.apache.paimon.table.source.splitread.SplitReadConfig;
+import org.apache.paimon.table.source.splitread.SplitReadProvider;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.RowKindFilter;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 import static org.apache.paimon.predicate.PredicateBuilder.and;
 import static org.apache.paimon.predicate.PredicateBuilder.pickTransformFieldMapping;
@@ -106,12 +113,19 @@ public class PrimaryKeyFileStoreTable extends AbstractFileStoreTable {
     @Override
     protected SplitGenerator splitGenerator() {
         CoreOptions options = store().options();
-        return new MergeTreeSplitGenerator(
-                store().newKeyComparator(),
-                options.splitTargetSize(),
-                options.splitOpenFileCost(),
-                options.deletionVectorsEnabled(),
-                options.mergeEngine());
+        if (coreOptions().dataEvolutionEnabled()) {
+            return new DataEvolutionSplitGenerator(
+                    options.splitTargetSize(),
+                    options.splitOpenFileCost(),
+                    options.blobSplitByFileSize());
+        } else {
+            return new MergeTreeSplitGenerator(
+                    store().newKeyComparator(),
+                    options.splitTargetSize(),
+                    options.splitOpenFileCost(),
+                    options.deletionVectorsEnabled(),
+                    options.mergeEngine());
+        }
     }
 
     @Override
@@ -146,8 +160,22 @@ public class PrimaryKeyFileStoreTable extends AbstractFileStoreTable {
 
     @Override
     public InnerTableRead newRead() {
-        return new KeyValueTableRead(
-                () -> store().newRead(), () -> store().newBatchRawFileRead(), schema());
+        if (coreOptions().dataEvolutionEnabled()) {
+            List<Function<SplitReadConfig, SplitReadProvider>> providerFactories =
+                    new ArrayList<>();
+            providerFactories.add(
+                    config ->
+                            new DataEvolutionMergeFileSplitReadProvider(
+                                    () -> store().newDataEvolutionRead(), config));
+            providerFactories.add(
+                    config ->
+                            new PrimaryKeyTableRawFileSplitReadProvider(
+                                    () -> store().newBatchRawFileRead(), config));
+            return new KeyValueTableRead(providerFactories, schema());
+        } else {
+            return new KeyValueTableRead(
+                    () -> store().newRead(), () -> store().newBatchRawFileRead(), schema());
+        }
     }
 
     @Override

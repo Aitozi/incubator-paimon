@@ -27,12 +27,18 @@ import org.apache.paimon.TestKeyValueGenerator;
 import org.apache.paimon.catalog.RenamingSnapshotCommit;
 import org.apache.paimon.catalog.SnapshotCommit;
 import org.apache.paimon.data.BinaryRow;
+import org.apache.paimon.data.BinaryString;
+import org.apache.paimon.data.GenericRow;
+import org.apache.paimon.data.serializer.InternalRowSerializer;
 import org.apache.paimon.deletionvectors.BucketedDvMaintainer;
 import org.apache.paimon.deletionvectors.DeletionVector;
 import org.apache.paimon.fs.Path;
 import org.apache.paimon.fs.local.LocalFileIO;
 import org.apache.paimon.index.IndexFileHandler;
 import org.apache.paimon.index.IndexFileMeta;
+import org.apache.paimon.io.CompactIncrement;
+import org.apache.paimon.io.DataFileMeta;
+import org.apache.paimon.io.DataIncrement;
 import org.apache.paimon.manifest.FileKind;
 import org.apache.paimon.manifest.IndexManifestEntry;
 import org.apache.paimon.manifest.ManifestCommittable;
@@ -946,6 +952,34 @@ public class FileStoreCommitTest {
     }
 
     @Test
+    public void testPrimaryKeyDataEvolutionAssignsFirstRowId() throws Exception {
+        Map<String, String> options = new HashMap<>();
+        options.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        options.put(CoreOptions.BUCKET.key(), "1");
+        TestFileStore store = createStore(false, 1, CoreOptions.ChangelogProducer.NONE, options);
+
+        try (FileStoreCommitImpl commit = newCommitWithoutKeyComparator(store, "commit-user")) {
+            commit.commit(
+                    committable(0, dataFile("first-file-1", 3), dataFile("first-file-2", 5)),
+                    false);
+        }
+        Snapshot snapshot1 = store.snapshotManager().latestSnapshot();
+        assertThat(snapshot1.nextRowId()).isEqualTo(8);
+        assertThat(deltaEntries(store, snapshot1))
+                .extracting(entry -> entry.file().firstRowId())
+                .containsExactly(0L, 3L);
+
+        try (FileStoreCommitImpl commit = newCommitWithoutKeyComparator(store, "commit-user")) {
+            commit.commit(committable(1, dataFile("second-file", 2)), false);
+        }
+        Snapshot snapshot2 = store.snapshotManager().latestSnapshot();
+        assertThat(snapshot2.nextRowId()).isEqualTo(10);
+        assertThat(deltaEntries(store, snapshot2))
+                .extracting(entry -> entry.file().firstRowId())
+                .containsExactly(8L);
+    }
+
+    @Test
     public void testManifestCompactFull() throws Exception {
         // Disable full compaction by options.
         TestFileStore store =
@@ -1118,6 +1152,44 @@ public class FileStoreCommitTest {
                 null);
     }
 
+    private FileStoreCommitImpl newCommitWithoutKeyComparator(
+            TestFileStore store, String commitUser) {
+        String tableName = store.options().path().getName();
+        return new FileStoreCommitImpl(
+                new RenamingSnapshotCommit(store.snapshotManager(), Lock.empty()),
+                store.fileIO(),
+                new SchemaManager(store.fileIO(), store.options().path()),
+                tableName,
+                commitUser,
+                store.partitionType(),
+                store.options(),
+                store.pathFactory(),
+                store.snapshotManager(),
+                store.manifestFileFactory(),
+                store.manifestListFactory(),
+                store.indexManifestFileFactory(),
+                store::newScan,
+                store.newStatsFileHandler(),
+                store.bucketMode(),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                scanner ->
+                        new ConflictDetection(
+                                tableName,
+                                commitUser,
+                                store.partitionType(),
+                                store.pathFactory(),
+                                null,
+                                store.bucketMode(),
+                                store.options().deletionVectorsEnabled(),
+                                store.options().dataEvolutionEnabled(),
+                                store.options().pkClusteringOverride(),
+                                store.newIndexFileHandler(),
+                                store.snapshotManager(),
+                                scanner),
+                null);
+    }
+
     private static class FalseSuccessSnapshotCommit implements SnapshotCommit {
 
         private final SnapshotCommit delegate;
@@ -1206,6 +1278,59 @@ public class FileStoreCommitTest {
     private List<KeyValue> generateDataList(int numRecords) {
         return generateData(numRecords).values().stream()
                 .flatMap(Collection::stream)
+                .collect(Collectors.toList());
+    }
+
+    private ManifestCommittable committable(long identifier, DataFileMeta... files) {
+        ManifestCommittable committable = new ManifestCommittable(identifier);
+        committable.addFileCommittable(
+                new CommitMessageImpl(
+                        partition(),
+                        0,
+                        1,
+                        new DataIncrement(
+                                Arrays.asList(files),
+                                Collections.emptyList(),
+                                Collections.emptyList()),
+                        CompactIncrement.emptyIncrement()));
+        return committable;
+    }
+
+    private BinaryRow partition() {
+        return new InternalRowSerializer(TestKeyValueGenerator.DEFAULT_PART_TYPE)
+                .toBinaryRow(GenericRow.of(BinaryString.fromString("20211110"), 8))
+                .copy();
+    }
+
+    private DataFileMeta dataFile(String fileName, long rowCount) {
+        BinaryRow key =
+                TestKeyValueGenerator.KEY_SERIALIZER.toBinaryRow(GenericRow.of(1, 1L)).copy();
+        return DataFileMeta.create(
+                fileName,
+                100,
+                rowCount,
+                key,
+                key,
+                EMPTY_STATS,
+                EMPTY_STATS,
+                0,
+                0,
+                0,
+                0,
+                Collections.emptyList(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+    }
+
+    private List<ManifestEntry> deltaEntries(TestFileStore store, Snapshot snapshot) {
+        ManifestFile manifestFile = store.manifestFileFactory().create();
+        return store.manifestListFactory().create().readDeltaManifests(snapshot).stream()
+                .flatMap(meta -> manifestFile.read(meta.fileName()).stream())
                 .collect(Collectors.toList());
     }
 

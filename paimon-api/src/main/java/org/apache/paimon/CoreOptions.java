@@ -2236,7 +2236,9 @@ public class CoreOptions implements Serializable {
             key("data-evolution.enabled")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription("Whether enable data evolution for row tracking table.");
+                    .withDescription(
+                            "Whether to enable data evolution. For append tables this requires row tracking. "
+                                    + "For primary key tables, assigned firstRowId values are physical alignment ranges only.");
 
     public static final ConfigOption<Boolean> BLOB_COMPACTION_ENABLED =
             key("blob-compaction.enabled")

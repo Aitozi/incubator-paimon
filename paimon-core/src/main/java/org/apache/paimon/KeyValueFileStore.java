@@ -28,6 +28,8 @@ import org.apache.paimon.io.KeyValueFileReaderFactory;
 import org.apache.paimon.mergetree.compact.MergeFunctionFactory;
 import org.apache.paimon.operation.AbstractFileStoreWrite;
 import org.apache.paimon.operation.BucketSelectConverter;
+import org.apache.paimon.operation.DataEvolutionMergeFileSplitRead;
+import org.apache.paimon.operation.DataEvolutionSplitRead;
 import org.apache.paimon.operation.KeyValueFileStoreScan;
 import org.apache.paimon.operation.KeyValueFileStoreWrite;
 import org.apache.paimon.operation.MergeFileSplitRead;
@@ -38,6 +40,7 @@ import org.apache.paimon.schema.SchemaManager;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.table.BucketMode;
 import org.apache.paimon.table.CatalogEnvironment;
+import org.apache.paimon.types.DataField;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.KeyComparatorSupplier;
 import org.apache.paimon.utils.UserDefinedSeqComparator;
@@ -110,6 +113,28 @@ public class KeyValueFileStore extends AbstractFileStore<KeyValue> {
                 newKeyComparator(),
                 mfFactory,
                 newReaderFactoryBuilder());
+    }
+
+    public DataEvolutionMergeFileSplitRead newDataEvolutionRead() {
+        return new DataEvolutionMergeFileSplitRead(
+                newRead(),
+                new DataEvolutionSplitRead(
+                        fileIO,
+                        schemaManager,
+                        schema,
+                        KeyValue.schema(keyType, valueType),
+                        options,
+                        pathFactory(),
+                        dataSchema -> {
+                            List<DataField> dataKeyFields =
+                                    keyValueFieldsExtractor.keyFields(dataSchema);
+                            List<DataField> dataValueFields =
+                                    keyValueFieldsExtractor.valueFields(dataSchema);
+                            return KeyValue.createKeyValueFields(dataKeyFields, dataValueFields);
+                        },
+                        (dataSchema, file) -> dataSchema.project(file.writeCols())),
+                keyType,
+                valueType);
     }
 
     public RawFileSplitRead newBatchRawFileRead() {

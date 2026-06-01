@@ -38,6 +38,7 @@ import org.apache.paimon.schema.SchemaManager;
 import org.apache.paimon.schema.TableSchema;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.FieldsComparator;
+import org.apache.paimon.utils.FileStorePathFactory;
 
 import javax.annotation.Nullable;
 
@@ -61,6 +62,7 @@ public interface KvCompactionManagerFactory extends Closeable {
             RowType keyType,
             RowType valueType,
             RowType partitionType,
+            FileStorePathFactory pathFactory,
             FileIO fileIO,
             SchemaManager schemaManager,
             TableSchema schema,
@@ -86,6 +88,7 @@ public interface KvCompactionManagerFactory extends Closeable {
                 keyType,
                 valueType,
                 partitionType,
+                pathFactory,
                 fileIO,
                 schemaManager,
                 schema,

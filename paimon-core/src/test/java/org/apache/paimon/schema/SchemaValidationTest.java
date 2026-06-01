@@ -62,6 +62,17 @@ class SchemaValidationTest {
                 new TableSchema(1, fields, 10, partitionKeys, primaryKeys, options, ""));
     }
 
+    private void validateAppendTableSchemaExec(Map<String, String> options) {
+        List<DataField> fields =
+                Arrays.asList(
+                        new DataField(0, "f0", DataTypes.INT()),
+                        new DataField(1, "f1", DataTypes.INT()),
+                        new DataField(2, "f2", DataTypes.INT()),
+                        new DataField(3, "f3", DataTypes.STRING()));
+        options.put(BUCKET.key(), String.valueOf(-1));
+        validateTableSchema(new TableSchema(1, fields, 10, emptyList(), emptyList(), options, ""));
+    }
+
     private void validateBlobSchema(Map<String, String> options, List<String> partitions) {
         List<DataField> fields =
                 Arrays.asList(
@@ -71,6 +82,34 @@ class SchemaValidationTest {
                         new DataField(3, "f3", DataTypes.STRING()));
         options.put(BUCKET.key(), String.valueOf(-1));
         validateTableSchema(new TableSchema(1, fields, 10, partitions, emptyList(), options, ""));
+    }
+
+    private void validatePrimaryKeyDataEvolutionSchema(Map<String, String> options) {
+        List<DataField> fields =
+                Arrays.asList(
+                        new DataField(0, "f0", DataTypes.INT()),
+                        new DataField(1, "f1", DataTypes.INT()),
+                        new DataField(2, "f2", DataTypes.STRING()));
+        validateTableSchema(
+                new TableSchema(
+                        1,
+                        fields,
+                        10,
+                        singletonList("f0"),
+                        Arrays.asList("f0", "f1"),
+                        options,
+                        ""));
+    }
+
+    private void validateCrossPartitionPrimaryKeyDataEvolutionSchema(Map<String, String> options) {
+        List<DataField> fields =
+                Arrays.asList(
+                        new DataField(0, "f0", DataTypes.INT()),
+                        new DataField(1, "f1", DataTypes.INT()),
+                        new DataField(2, "f2", DataTypes.STRING()));
+        validateTableSchema(
+                new TableSchema(
+                        1, fields, 10, singletonList("f0"), singletonList("f1"), options, ""));
     }
 
     @Test
@@ -167,6 +206,39 @@ class SchemaValidationTest {
                                             ""));
                         })
                 .hasMessage("Table with BLOB type column must have other normal columns.");
+    }
+
+    @Test
+    public void testPrimaryKeyDataEvolutionSchema() {
+        Map<String, String> appendOptions = new HashMap<>();
+        appendOptions.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        assertThatThrownBy(() -> validateAppendTableSchemaExec(appendOptions))
+                .hasMessage("Data evolution config must enabled with row-tracking.enabled");
+
+        Map<String, String> options = new HashMap<>();
+        options.put(CoreOptions.DATA_EVOLUTION_ENABLED.key(), "true");
+        options.put(CoreOptions.BUCKET.key(), "1");
+        assertThatCode(() -> validatePrimaryKeyDataEvolutionSchema(options))
+                .doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> validateCrossPartitionPrimaryKeyDataEvolutionSchema(options))
+                .hasMessage(
+                        "Primary key data evolution table does not support cross partition update.");
+
+        options.put(CoreOptions.DELETION_VECTORS_ENABLED.key(), "true");
+        assertThatThrownBy(() -> validatePrimaryKeyDataEvolutionSchema(options))
+                .hasMessage("Data evolution config must disabled with deletion-vectors.enabled");
+
+        options.remove(CoreOptions.DELETION_VECTORS_ENABLED.key());
+        options.put(CoreOptions.BUCKET.key(), "-1");
+        assertThatThrownBy(() -> validatePrimaryKeyDataEvolutionSchema(options))
+                .hasMessage("Primary key data evolution table only supports fixed bucket.");
+
+        options.put(CoreOptions.BUCKET.key(), "1");
+        options.put(CoreOptions.MERGE_ENGINE.key(), "partial-update");
+        assertThatThrownBy(() -> validatePrimaryKeyDataEvolutionSchema(options))
+                .hasMessage(
+                        "Primary key data evolution table only supports deduplicate merge engine.");
     }
 
     @Test

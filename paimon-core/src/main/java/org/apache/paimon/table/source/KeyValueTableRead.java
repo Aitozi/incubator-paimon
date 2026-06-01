@@ -34,6 +34,7 @@ import org.apache.paimon.table.source.splitread.IncrementalChangelogReadProvider
 import org.apache.paimon.table.source.splitread.IncrementalDiffReadProvider;
 import org.apache.paimon.table.source.splitread.MergeFileSplitReadProvider;
 import org.apache.paimon.table.source.splitread.PrimaryKeyTableRawFileSplitReadProvider;
+import org.apache.paimon.table.source.splitread.SplitReadConfig;
 import org.apache.paimon.table.source.splitread.SplitReadProvider;
 import org.apache.paimon.types.RowType;
 
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -72,6 +74,16 @@ public final class KeyValueTableRead extends AbstractDataTableRead {
                         new MergeFileSplitReadProvider(mergeReadSupplier, this::config),
                         new IncrementalChangelogReadProvider(mergeReadSupplier, this::config),
                         new IncrementalDiffReadProvider(mergeReadSupplier, this::config));
+    }
+
+    public KeyValueTableRead(
+            List<Function<SplitReadConfig, SplitReadProvider>> providerFactories,
+            TableSchema schema) {
+        super(schema);
+        this.readProviders = new ArrayList<>();
+        for (Function<SplitReadConfig, SplitReadProvider> factory : providerFactories) {
+            this.readProviders.add(factory.apply(this::config));
+        }
     }
 
     private List<SplitRead<InternalRow>> initialized() {

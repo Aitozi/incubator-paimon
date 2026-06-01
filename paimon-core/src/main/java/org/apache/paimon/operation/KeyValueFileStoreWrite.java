@@ -54,6 +54,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -76,6 +77,8 @@ public class KeyValueFileStoreWrite extends MemoryFileStoreWrite<KeyValue> {
     private final RowType valueType;
     private final String commitUser;
     private final KvCompactionManagerFactory compactManagerFactory;
+    private RowType writeValueType;
+    @Nullable private List<String> writeCols;
 
     public KeyValueFileStoreWrite(
             FileIO fileIO,
@@ -134,6 +137,7 @@ public class KeyValueFileStoreWrite extends MemoryFileStoreWrite<KeyValue> {
         this.keyComparatorSupplier = keyComparatorSupplier;
         this.mfFactory = mfFactory;
         this.options = options;
+        this.writeValueType = valueType;
         this.compactManagerFactory =
                 KvCompactionManagerFactory.create(
                         readerFactoryBuilder,
@@ -146,11 +150,22 @@ public class KeyValueFileStoreWrite extends MemoryFileStoreWrite<KeyValue> {
                         keyType,
                         valueType,
                         partitionType,
+                        pathFactory,
                         fileIO,
                         schemaManager,
                         schema,
                         recordLevelExpire,
                         cacheManager);
+    }
+
+    @Override
+    public void withWriteType(RowType writeType) {
+        this.writeValueType = writeType;
+        if (writeType.getFieldNames().equals(valueType.getFieldNames())) {
+            this.writeCols = null;
+        } else {
+            this.writeCols = new ArrayList<>(writeType.getFieldNames());
+        }
     }
 
     @Override
@@ -188,7 +203,9 @@ public class KeyValueFileStoreWrite extends MemoryFileStoreWrite<KeyValue> {
         }
 
         KeyValueFileWriterFactory writerFactory =
-                writerFactoryBuilder.build(partition, bucket, options);
+                writerFactoryBuilder
+                        .withValueType(writeValueType, writeCols)
+                        .build(partition, bucket, options);
         Comparator<InternalRow> keyComparator = keyComparatorSupplier.get();
         CompactManager compactManager =
                 compactManagerFactory.create(

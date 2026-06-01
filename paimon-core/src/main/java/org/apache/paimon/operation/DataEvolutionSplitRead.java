@@ -42,7 +42,6 @@ import org.apache.paimon.reader.ReaderSupplier;
 import org.apache.paimon.reader.RecordReader;
 import org.apache.paimon.schema.SchemaManager;
 import org.apache.paimon.schema.TableSchema;
-import org.apache.paimon.table.SpecialFields;
 import org.apache.paimon.table.source.DataSplit;
 import org.apache.paimon.table.source.Split;
 import org.apache.paimon.types.DataField;
@@ -67,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
@@ -95,6 +95,8 @@ public class DataEvolutionSplitRead implements SplitRead<InternalRow> {
     private final FileStorePathFactory pathFactory;
     private final Map<FormatKey, FormatReaderMapping> formatReaderMappings;
     private final Function<Long, TableSchema> schemaFetcher;
+    private final Function<TableSchema, List<DataField>> fileFieldsExtractor;
+    private final BiFunction<TableSchema, DataFileMeta, TableSchema> fileSchemaProjector;
     private final CoreOptions coreOptions;
 
     protected RowType readRowType;
@@ -106,6 +108,26 @@ public class DataEvolutionSplitRead implements SplitRead<InternalRow> {
             RowType rowType,
             CoreOptions coreOptions,
             FileStorePathFactory pathFactory) {
+        this(
+                fileIO,
+                schemaManager,
+                schema,
+                rowType,
+                coreOptions,
+                pathFactory,
+                s -> rowTypeWithRowTracking(s.logicalRowType(), true, true).getFields(),
+                (s, file) -> s.project(file.writeCols()));
+    }
+
+    public DataEvolutionSplitRead(
+            FileIO fileIO,
+            SchemaManager schemaManager,
+            TableSchema schema,
+            RowType rowType,
+            CoreOptions coreOptions,
+            FileStorePathFactory pathFactory,
+            Function<TableSchema, List<DataField>> fileFieldsExtractor,
+            BiFunction<TableSchema, DataFileMeta, TableSchema> fileSchemaProjector) {
         this.fileIO = fileIO;
         final Map<Long, TableSchema> cache = new HashMap<>();
         this.schemaFetcher =
@@ -116,6 +138,8 @@ public class DataEvolutionSplitRead implements SplitRead<InternalRow> {
         this.pathFactory = pathFactory;
         this.formatReaderMappings = new HashMap<>();
         this.readRowType = rowType;
+        this.fileFieldsExtractor = fileFieldsExtractor;
+        this.fileSchemaProjector = fileSchemaProjector;
     }
 
     @Override
@@ -167,9 +191,7 @@ public class DataEvolutionSplitRead implements SplitRead<InternalRow> {
                         formatDiscover,
                         readRowType.getFields(),
                         // file has no row id and sequence number, they are in manifest entry
-                        schema ->
-                                rowTypeWithRowTracking(schema.logicalRowType(), true, true)
-                                        .getFields(),
+                        fileFieldsExtractor,
                         null,
                         null,
                         null);
@@ -263,10 +285,10 @@ public class DataEvolutionSplitRead implements SplitRead<InternalRow> {
             DataFileMeta firstFile = bunch.files().get(0);
             String formatIdentifier = DataFilePathFactory.formatIdentifier(firstFile.fileName());
             long schemaId = firstFile.schemaId();
-            TableSchema dataSchema = schemaFetcher.apply(schemaId).project(firstFile.writeCols());
+            TableSchema dataSchema =
+                    fileSchemaProjector.apply(schemaFetcher.apply(schemaId), firstFile);
             int[] fieldIds =
-                    SpecialFields.rowTypeWithRowTracking(dataSchema.logicalRowType()).getFields()
-                            .stream()
+                    fileFieldsExtractor.apply(dataSchema).stream()
                             .mapToInt(DataField::id)
                             .toArray();
             List<DataField> readFields = new ArrayList<>();
@@ -438,14 +460,16 @@ public class DataEvolutionSplitRead implements SplitRead<InternalRow> {
         long schemaId = file.schemaId();
         FormatReaderMapping formatReaderMapping =
                 formatReaderMappings.computeIfAbsent(
-                        new FormatKey(file.schemaId(), formatIdentifier),
+                        new FormatKey(file.schemaId(), formatIdentifier, file.writeCols()),
                         key ->
                                 formatBuilder.build(
                                         formatIdentifier,
                                         schema,
-                                        schemaId == schema.id()
-                                                ? schema
-                                                : schemaFetcher.apply(schemaId)));
+                                        fileSchemaProjector.apply(
+                                                schemaId == schema.id()
+                                                        ? schema
+                                                        : schemaFetcher.apply(schemaId),
+                                                file)));
         return createFileReader(
                 partition, file, dataFilePathFactory, formatReaderMapping, rowRanges, readRowType);
     }

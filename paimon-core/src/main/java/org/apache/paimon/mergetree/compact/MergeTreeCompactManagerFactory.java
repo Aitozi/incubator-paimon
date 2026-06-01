@@ -53,12 +53,16 @@ import org.apache.paimon.mergetree.lookup.PersistProcessor;
 import org.apache.paimon.mergetree.lookup.PersistValueAndPosProcessor;
 import org.apache.paimon.mergetree.lookup.PersistValueProcessor;
 import org.apache.paimon.mergetree.lookup.RemoteLookupFileManager;
+import org.apache.paimon.operation.DataEvolutionKeyValueFileReaderFactory;
+import org.apache.paimon.operation.DataEvolutionSplitRead;
 import org.apache.paimon.operation.metrics.CompactionMetrics;
 import org.apache.paimon.options.Options;
 import org.apache.paimon.schema.SchemaManager;
 import org.apache.paimon.schema.TableSchema;
+import org.apache.paimon.table.PrimaryKeyTableUtils;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.utils.FieldsComparator;
+import org.apache.paimon.utils.FileStorePathFactory;
 import org.apache.paimon.utils.UserDefinedSeqComparator;
 
 import org.apache.paimon.shade.caffeine2.com.github.benmanes.caffeine.cache.Cache;
@@ -88,6 +92,7 @@ public class MergeTreeCompactManagerFactory implements KvCompactionManagerFactor
     private final RowType keyType;
     private final RowType valueType;
     private final RowType partitionType;
+    private final FileStorePathFactory pathFactory;
     private final FileIO fileIO;
     private final SchemaManager schemaManager;
     private final TableSchema schema;
@@ -109,6 +114,7 @@ public class MergeTreeCompactManagerFactory implements KvCompactionManagerFactor
             RowType keyType,
             RowType valueType,
             RowType partitionType,
+            FileStorePathFactory pathFactory,
             FileIO fileIO,
             SchemaManager schemaManager,
             TableSchema schema,
@@ -124,6 +130,7 @@ public class MergeTreeCompactManagerFactory implements KvCompactionManagerFactor
         this.keyType = keyType;
         this.valueType = valueType;
         this.partitionType = partitionType;
+        this.pathFactory = pathFactory;
         this.fileIO = fileIO;
         this.schemaManager = schemaManager;
         this.schema = schema;
@@ -252,6 +259,25 @@ public class MergeTreeCompactManagerFactory implements KvCompactionManagerFactor
         KeyValueFileReaderFactory keyReaderFactory =
                 readerFactoryBuilder.build(partition, bucket, dvFactory);
         FileReaderFactory<KeyValue> readerFactory = keyReaderFactory;
+        if (options.dataEvolutionEnabled() && !schema.primaryKeys().isEmpty()) {
+            DataEvolutionSplitRead unionRead =
+                    new DataEvolutionSplitRead(
+                            fileIO,
+                            schemaManager,
+                            schema,
+                            KeyValue.schema(keyType, valueType),
+                            options,
+                            pathFactory,
+                            dataSchema ->
+                                    KeyValue.createKeyValueFields(
+                                            PrimaryKeyTableUtils.addKeyNamePrefix(
+                                                    dataSchema.trimmedPrimaryKeysFields()),
+                                            dataSchema.fields()),
+                            (dataSchema, file) -> dataSchema.project(file.writeCols()));
+            readerFactory =
+                    new DataEvolutionKeyValueFileReaderFactory(
+                            partition, bucket, levels.allFiles(), unionRead, keyType, valueType);
+        }
         if (recordLevelExpire != null) {
             readerFactory = recordLevelExpire.wrap(readerFactory);
         }

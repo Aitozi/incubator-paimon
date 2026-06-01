@@ -305,6 +305,14 @@ public interface DataFileMeta {
     @Nullable
     Long firstRowId();
 
+    /**
+     * Row range used by data evolution.
+     *
+     * <p>For append row-tracking tables, this is the start of a tracked row-id range. For primary
+     * key data evolution tables, this is only the start of a physical alignment range for files in
+     * the same aligned group. It is not a stable row identity and may be reassigned after
+     * compaction.
+     */
     default long nonNullFirstRowId() {
         Long firstRowId = firstRowId();
         checkArgument(firstRowId != null, "First row id of '%s' should not be null.", fileName());

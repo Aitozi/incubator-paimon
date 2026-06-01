@@ -46,6 +46,7 @@ import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -64,13 +65,15 @@ public class KeyValueFileWriterFactory {
     private final long suggestedFileSize;
     private final CoreOptions options;
     private final FileIndexOptions fileIndexOptions;
+    @Nullable private final List<String> writeCols;
 
     private KeyValueFileWriterFactory(
             FileIO fileIO,
             long schemaId,
             FileWriterContextFactory formatContext,
             long suggestedFileSize,
-            CoreOptions options) {
+            CoreOptions options,
+            @Nullable List<String> writeCols) {
         this.fileIO = fileIO;
         this.schemaId = schemaId;
         this.keyType = formatContext.keyType;
@@ -79,6 +82,7 @@ public class KeyValueFileWriterFactory {
         this.suggestedFileSize = suggestedFileSize;
         this.options = options;
         this.fileIndexOptions = options.indexColumnsOptions();
+        this.writeCols = writeCols;
     }
 
     public RowType keyType() {
@@ -164,7 +168,8 @@ public class KeyValueFileWriterFactory {
                         options,
                         fileSource,
                         indexOptions,
-                        isExternalPath)
+                        isExternalPath,
+                        writeCols)
                 : new KeyValueDataFileWriterImpl(
                         fileIO,
                         formatContext.fileWriterContext(key),
@@ -177,7 +182,8 @@ public class KeyValueFileWriterFactory {
                         options,
                         fileSource,
                         indexOptions,
-                        isExternalPath);
+                        isExternalPath,
+                        writeCols);
     }
 
     public void deleteFile(DataFileMeta file) {
@@ -223,6 +229,7 @@ public class KeyValueFileWriterFactory {
         private final FileFormat fileFormat;
         private final Function<String, FileStorePathFactory> format2PathFactory;
         private final long suggestedFileSize;
+        @Nullable private final List<String> writeCols;
 
         private Builder(
                 FileIO fileIO,
@@ -232,6 +239,26 @@ public class KeyValueFileWriterFactory {
                 FileFormat fileFormat,
                 Function<String, FileStorePathFactory> format2PathFactory,
                 long suggestedFileSize) {
+            this(
+                    fileIO,
+                    schemaId,
+                    keyType,
+                    valueType,
+                    fileFormat,
+                    format2PathFactory,
+                    suggestedFileSize,
+                    null);
+        }
+
+        private Builder(
+                FileIO fileIO,
+                long schemaId,
+                RowType keyType,
+                RowType valueType,
+                FileFormat fileFormat,
+                Function<String, FileStorePathFactory> format2PathFactory,
+                long suggestedFileSize,
+                @Nullable List<String> writeCols) {
             this.fileIO = fileIO;
             this.schemaId = schemaId;
             this.keyType = keyType;
@@ -239,6 +266,19 @@ public class KeyValueFileWriterFactory {
             this.fileFormat = fileFormat;
             this.format2PathFactory = format2PathFactory;
             this.suggestedFileSize = suggestedFileSize;
+            this.writeCols = writeCols;
+        }
+
+        public Builder withValueType(RowType valueType, @Nullable List<String> writeCols) {
+            return new Builder(
+                    fileIO,
+                    schemaId,
+                    keyType,
+                    valueType,
+                    fileFormat,
+                    format2PathFactory,
+                    suggestedFileSize,
+                    writeCols);
         }
 
         public KeyValueFileWriterFactory build(
@@ -253,7 +293,7 @@ public class KeyValueFileWriterFactory {
                             format2PathFactory,
                             options);
             return new KeyValueFileWriterFactory(
-                    fileIO, schemaId, context, suggestedFileSize, options);
+                    fileIO, schemaId, context, suggestedFileSize, options, writeCols);
         }
     }
 

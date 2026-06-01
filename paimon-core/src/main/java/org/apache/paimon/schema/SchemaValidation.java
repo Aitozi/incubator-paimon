@@ -745,6 +745,7 @@ public class SchemaValidation {
 
     private static void validateRowTracking(TableSchema schema, CoreOptions options) {
         boolean rowTrackingEnabled = options.rowTrackingEnabled();
+        boolean primaryKeyTable = !schema.primaryKeys().isEmpty();
         if (rowTrackingEnabled) {
             checkArgument(
                     schema.primaryKeys().isEmpty(),
@@ -757,9 +758,21 @@ public class SchemaValidation {
         }
 
         if (options.dataEvolutionEnabled()) {
-            checkArgument(
-                    rowTrackingEnabled,
-                    "Data evolution config must enabled with row-tracking.enabled");
+            if (primaryKeyTable) {
+                checkArgument(
+                        options.mergeEngine() == MergeEngine.DEDUPLICATE,
+                        "Primary key data evolution table only supports deduplicate merge engine.");
+                checkArgument(
+                        options.bucket() > 0,
+                        "Primary key data evolution table only supports fixed bucket.");
+                checkArgument(
+                        !schema.crossPartitionUpdate(),
+                        "Primary key data evolution table does not support cross partition update.");
+            } else {
+                checkArgument(
+                        rowTrackingEnabled,
+                        "Data evolution config must enabled with row-tracking.enabled");
+            }
             checkArgument(
                     !options.deletionVectorsEnabled(),
                     "Data evolution config must disabled with deletion-vectors.enabled");

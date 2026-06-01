@@ -123,6 +123,14 @@ public class MergeFileSplitRead implements SplitRead<KeyValue> {
         return tableSchema;
     }
 
+    public MergeFunctionFactory<KeyValue> mergeFunctionFactory() {
+        return mfFactory;
+    }
+
+    public RowType actualReadType() {
+        return readerFactoryBuilder.readValueType();
+    }
+
     public MergeFileSplitRead withReadKeyType(RowType readKeyType) {
         readerFactoryBuilder.withReadKeyType(readKeyType);
         this.readKeyType = readKeyType;
@@ -341,10 +349,6 @@ public class MergeFileSplitRead implements SplitRead<KeyValue> {
      * Returns the pushed read type if {@link #withReadType(RowType)} was called, else the default
      * read type.
      */
-    private RowType actualReadType() {
-        return readerFactoryBuilder.readValueType();
-    }
-
     private RecordReader<KeyValue> projectKey(RecordReader<KeyValue> reader) {
         if (readKeyType == null) {
             return reader;

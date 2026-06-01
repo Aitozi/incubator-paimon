@@ -18,6 +18,7 @@
 
 package org.apache.paimon.operation.commit;
 
+import org.apache.paimon.manifest.FileKind;
 import org.apache.paimon.manifest.FileSource;
 import org.apache.paimon.manifest.ManifestEntry;
 import org.apache.paimon.table.SpecialFields;
@@ -45,6 +46,21 @@ public class RowTrackingCommitUtils {
         long nextRowIdStart =
                 assignRowTrackingMeta(firstRowIdStart, snapshotAssigned, rowIdAssigned);
         return new RowTrackingAssigned(nextRowIdStart, rowIdAssigned);
+    }
+
+    public static RowTrackingAssigned assignPrimaryKeyAlignment(
+            long firstRowIdStart, List<ManifestEntry> deltaFiles) {
+        List<ManifestEntry> assigned = new ArrayList<>();
+        long start = firstRowIdStart;
+        for (ManifestEntry entry : deltaFiles) {
+            if (entry.kind() == FileKind.ADD && entry.file().firstRowId() == null) {
+                assigned.add(entry.assignFirstRowId(start));
+                start += entry.file().rowCount();
+            } else {
+                assigned.add(entry);
+            }
+        }
+        return new RowTrackingAssigned(start, assigned);
     }
 
     private static void assignSnapshotId(

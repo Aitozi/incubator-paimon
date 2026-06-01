@@ -68,6 +68,7 @@ public abstract class KeyValueDataFileWriter
     private final RowHelper keyKeeper;
     private final FileSource fileSource;
     @Nullable private final DataFileIndexWriter dataFileIndexWriter;
+    @Nullable private final List<String> writeCols;
 
     private BinaryRow minKey = null;
     private long minSeqNumber = Long.MAX_VALUE;
@@ -87,7 +88,8 @@ public abstract class KeyValueDataFileWriter
             CoreOptions options,
             FileSource fileSource,
             FileIndexOptions fileIndexOptions,
-            boolean isExternalPath) {
+            boolean isExternalPath,
+            @Nullable List<String> writeCols) {
         super(fileIO, context, path, converter, writeRowType, options.asyncFileWrite());
 
         this.keyType = keyType;
@@ -103,6 +105,7 @@ public abstract class KeyValueDataFileWriter
         this.dataFileIndexWriter =
                 DataFileIndexWriter.create(
                         fileIO, dataFileToFileIndexPath(path), valueType, fileIndexOptions);
+        this.writeCols = writeCols;
     }
 
     @Override
@@ -180,7 +183,7 @@ public abstract class KeyValueDataFileWriter
                 valueStatsPair.getKey(),
                 externalPath,
                 null,
-                null);
+                writeCols);
     }
 
     abstract Pair<SimpleColStats[], SimpleColStats[]> fetchKeyValueStats(SimpleColStats[] rowStats);
