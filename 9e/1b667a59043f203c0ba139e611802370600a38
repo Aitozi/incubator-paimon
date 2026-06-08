@@ -1,0 +1,300 @@
+paimon-common/src/main/java/org/apache/paimon/table/SpecialFields.java
+  3a4598d1a3ff5330 96-98,105-106,179-188 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a16cffb0fc64e77bae0345d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[96,98]},{"Range":[105,106]},{"Range":[179,188]}]}]}
+paimon-core/src/main/java/org/apache/paimon/utils/MetaColumns.java
+  3a4598d1a3ff5330 60 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a16cffb0fc64e77bae0345d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":60}]}]}
+paimon-spark/paimon-spark-common/src/main/scala/org/apache/paimon/spark/commands/PaimonSparkWriter.scala
+  3a4598d1a3ff5330 93-96,147-171,182,184-200,556,576-580 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a16cffb0fc64e77bae0345d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Range":[93,96]},{"Range":[147,171]},{"Single":182},{"Range":[184,200]},{"Single":556},{"Range":[576,580]}]}]}
+paimon-spark/paimon-spark-3.2-bd/src/main/scala/org/apache/paimon/spark/execution/PaimonFileSourceScanExec.scala
+  3a4598d1a3ff5330 28,184-197,199,214,292-294,297-300,553-557 gitai:{"mixed_line_ranges":[{"Single":557}],"operations":[{"operation_id":"6a16cffb0fc64e77bae0345d","tool_type":"agent","tool_id":"Edit","line_ranges":[{"Single":28},{"Range":[184,197]},{"Single":199},{"Single":214},{"Range":[292,294]},{"Range":[297,300]},{"Range":[553,557]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "9e1b667a59043f203c0ba139e611802370600a38",
+  "prompts": {
+    "3a4598d1a3ff5330": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a13fc630fc64e77bae02dbb",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "linchen.23 <linchen.23@bytedance.com>",
+      "messages": [],
+      "total_additions": 40,
+      "total_deletions": 120,
+      "accepted_lines": 28,
+      "overriden_lines": 1
+    },
+    "b05acb1d243e7283": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0831a00fc64e77bae02610",
+        "model": "openrouter-2o__dev"
+      },
+      "human_author": "linchen.23 <linchen.23@bytedance.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 2,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "paimon-common/src/main/java/org/apache/paimon/table/SpecialFields.java": [
+      {
+        "hash": "3a4598d1a3ff5330",
+        "line_ranges": [
+          {
+            "Range": [
+              96,
+              98
+            ]
+          },
+          {
+            "Range": [
+              105,
+              106
+            ]
+          },
+          {
+            "Range": [
+              179,
+              188
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a16cffb0fc64e77bae0345d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  96,
+                  98
+                ]
+              },
+              {
+                "Range": [
+                  105,
+                  106
+                ]
+              },
+              {
+                "Range": [
+                  179,
+                  188
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "paimon-core/src/main/java/org/apache/paimon/utils/MetaColumns.java": [
+      {
+        "hash": "3a4598d1a3ff5330",
+        "line_ranges": [
+          {
+            "Single": 60
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a16cffb0fc64e77bae0345d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 60
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "paimon-spark/paimon-spark-3.2-bd/src/main/scala/org/apache/paimon/spark/execution/PaimonFileSourceScanExec.scala": [
+      {
+        "hash": "3a4598d1a3ff5330",
+        "line_ranges": [
+          {
+            "Single": 28
+          },
+          {
+            "Range": [
+              184,
+              197
+            ]
+          },
+          {
+            "Single": 199
+          },
+          {
+            "Single": 214
+          },
+          {
+            "Range": [
+              292,
+              294
+            ]
+          },
+          {
+            "Range": [
+              297,
+              300
+            ]
+          },
+          {
+            "Range": [
+              553,
+              557
+            ]
+          }
+        ],
+        "mixed_line_ranges": [
+          {
+            "Single": 557
+          }
+        ],
+        "operations": [
+          {
+            "operation_id": "6a16cffb0fc64e77bae0345d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Single": 28
+              },
+              {
+                "Range": [
+                  184,
+                  197
+                ]
+              },
+              {
+                "Single": 199
+              },
+              {
+                "Single": 214
+              },
+              {
+                "Range": [
+                  292,
+                  294
+                ]
+              },
+              {
+                "Range": [
+                  297,
+                  300
+                ]
+              },
+              {
+                "Range": [
+                  553,
+                  557
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "paimon-spark/paimon-spark-common/src/main/scala/org/apache/paimon/spark/commands/PaimonSparkWriter.scala": [
+      {
+        "hash": "3a4598d1a3ff5330",
+        "line_ranges": [
+          {
+            "Range": [
+              93,
+              96
+            ]
+          },
+          {
+            "Range": [
+              147,
+              171
+            ]
+          },
+          {
+            "Single": 182
+          },
+          {
+            "Range": [
+              184,
+              200
+            ]
+          },
+          {
+            "Single": 556
+          },
+          {
+            "Range": [
+              576,
+              580
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a16cffb0fc64e77bae0345d",
+            "tool_type": "agent",
+            "tool_id": "Edit",
+            "line_ranges": [
+              {
+                "Range": [
+                  93,
+                  96
+                ]
+              },
+              {
+                "Range": [
+                  147,
+                  171
+                ]
+              },
+              {
+                "Single": 182
+              },
+              {
+                "Range": [
+                  184,
+                  200
+                ]
+              },
+              {
+                "Single": 556
+              },
+              {
+                "Range": [
+                  576,
+                  580
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "3a4598d1a3ff5330": {
+      "tool": "trae",
+      "conversation_id": "6a13fc630fc64e77bae02dbb",
+      "session_id": "6a13fc630fc64e77bae02dbb",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    },
+    "b05acb1d243e7283": {
+      "tool": "trae",
+      "conversation_id": "6a0831a00fc64e77bae02610",
+      "session_id": "6a0831a00fc64e77bae02610",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}

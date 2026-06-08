@@ -1,0 +1,63 @@
+paimon-core/src/test/java/org/apache/paimon/utils/CatalogBranchManagerTest.java
+  67c64dd6fa70ad62 51-167 gitai:{"mixed_line_ranges":[],"operations":[{"operation_id":"6a0c32c639a354cc25cd9be5","tool_type":"agent","tool_id":"SearchReplace","line_ranges":[{"Range":[51,167]}]}]}
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "71958cc5d2dec0ff411ec2e16c0c74fd5e383b3c",
+  "prompts": {
+    "67c64dd6fa70ad62": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a0690cf84bcc9c8dc26b9ca",
+        "model": "glm-5.1__dev"
+      },
+      "human_author": "zhangkkailun.zkl <zhangkkailun.zkl@bytedance.com>",
+      "messages": [],
+      "total_additions": 83,
+      "total_deletions": 36,
+      "accepted_lines": 74,
+      "overriden_lines": 0
+    }
+  },
+  "attestation_metadata": {
+    "paimon-core/src/test/java/org/apache/paimon/utils/CatalogBranchManagerTest.java": [
+      {
+        "hash": "67c64dd6fa70ad62",
+        "line_ranges": [
+          {
+            "Range": [
+              51,
+              167
+            ]
+          }
+        ],
+        "mixed_line_ranges": [],
+        "operations": [
+          {
+            "operation_id": "6a0c32c639a354cc25cd9be5",
+            "tool_type": "agent",
+            "tool_id": "SearchReplace",
+            "line_ranges": [
+              {
+                "Range": [
+                  51,
+                  167
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "remote_transcripts": {
+    "67c64dd6fa70ad62": {
+      "tool": "trae",
+      "conversation_id": "6a0690cf84bcc9c8dc26b9ca",
+      "session_id": "6a0690cf84bcc9c8dc26b9ca",
+      "status": "remote_only",
+      "message": "Remote transcript resolution is not implemented yet for TRAE prompts."
+    }
+  }
+}
